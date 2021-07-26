@@ -134,6 +134,12 @@ if num_obs_sectors == 0:
     sys.exit()
 
 print(sector_data)
+print('\n')
+print('Table of Cycles by Sector:')
+print('Cycle 1: Sectors 1-13')
+print('Cycle 2: Sectors 14-26')
+print('Cycle 3: Sectors 27-39')
+print('Cycle 4: Sectors 40-55')
 
 #Set cycle of interest:
 
@@ -384,7 +390,7 @@ else:
                     #And correct it:
                     clc = lk.RegressionCorrector(lc).correct(dm)
 
-                    #NOW BEGIN PART WHERE I DO IT THE OLD FASHIONED WAY TO COMPARE:
+                    #Now we begin the simpler method of using 5 PCA components, with no hybrid matrix:
 
                     raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
 
