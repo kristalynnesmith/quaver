@@ -474,8 +474,10 @@ else:
                     print("\nMoving to next sector.\n")
 #############################################
 #############################################
+            else:
 
-
+                print('Selected data are not in desired Cycle.')
+                sys.exit()
 
         # If target coordinates are too close to edge on approach, this will skip that sector and read the next.
         # If target coordinates are too close to edge on exit, this will skip that sector and break on the next loop.
