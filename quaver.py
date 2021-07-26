@@ -203,9 +203,9 @@ else:
                     #Get WCS information and flux stats of the TPF image.
                     tpf_wcs = WCS(tpf.get_header(ext=2))
 
-                    pixmin = np.min(tpf.flux[200])
-                    pixmax = np.max(tpf.flux[200])
-                    pixmean = np.mean(tpf.flux[200])
+                    pixmin = np.min(tpf.flux[200]).value
+                    pixmax = np.max(tpf.flux[200]).value
+                    pixmean = np.mean(tpf.flux[200]).value
 
                     temp_min = float(pixmin)
                     # print(temp_min)
@@ -352,7 +352,7 @@ else:
 
                     # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
 
-                    r = lk.RegressionCorrector(lk.LightCurve(tpf.time, tpf.time*0))
+                    r = lk.RegressionCorrector(lk.LightCurve(tpf.time, tpf.time.value*0))
 
                     corrected_pixels = []
                     for idx in range(allbright_mask.sum()):
@@ -447,15 +447,15 @@ else:
                         plt.show()
                     except FileExistsError:
                         print("Saving to folder '% s'\n" % directory)
-                        plt.savefig('../regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
                         plt.show()
 ##################################################################################
 ###############################################################################
 
 
 
-                    regression_corrected_lc = np.column_stack((clc.time,clc.flux,clc.flux_err))
-                    pca_corrected_lc = np.column_stack((corrected_lc_pca5_OF.time,corrected_lc_pca5_OF.flux,corrected_lc_pca5_OF.flux_err))
+                    regression_corrected_lc = np.column_stack((clc.time.value,clc.flux.value,clc.flux_err.value))
+                    pca_corrected_lc = np.column_stack((corrected_lc_pca5_OF.time.value,corrected_lc_pca5_OF.flux.value,corrected_lc_pca5_OF.flux_err.value))
 
                     unstitched_lc_regression.append(regression_corrected_lc)
                     unstitched_lc_pca.append(pca_corrected_lc)
