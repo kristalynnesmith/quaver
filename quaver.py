@@ -429,7 +429,6 @@ else:
 
                     tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
-                    directory = str(target)
                     # print("\n")
                     print("\nMade lightcurve and aperture selection.\n")
 
@@ -438,15 +437,17 @@ else:
                     ##  then saves the corrected lightcurves along with additive and multiplicative components as well as the aperture selection
 
 ###############################################################################
-###############################################################################
+##############################################################################
+                    directory = str(target).replace(" ","")
+                    target_safename = target.replace(" ","")
                     try:
-                        os.mkdir('../regression_program_output/'+target)
+                        os.makedirs('regression_program_output/'+target_safename)
                         print("Directory '% s' created\n" % directory)
-                        plt.savefig('../regression_program_output/'+target+'/'+target+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
                         plt.show()
                     except FileExistsError:
                         print("Saving to folder '% s'\n" % directory)
-                        plt.savefig('../regression_program_output/'+target+'/'+target+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                        plt.savefig('../regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
                         plt.show()
 ##################################################################################
 ###############################################################################
@@ -600,8 +601,8 @@ for i in range(0,1-len(full_lc_time_pca)):
 regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
 pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-np.savetxt('../regression_program_output/'+target+'/'+target+'_full_hybrid_regressed_lc.dat',regression_lc)
-np.savetxt('../regression_program_output/'+target+'/'+target+'_full_pca5_lc.dat',pca5_lc)
+np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_hybrid_regressed_lc.dat',regression_lc)
+np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_pca5_lc.dat',pca5_lc)
 
 
 
@@ -618,7 +619,7 @@ for i in range(0,len(unstitched_lc_regression)):
 
     plt.axvline(x=last_time,color='k',linestyle='--')
 
-plt.savefig('../regression_program_output/'+target+'/'+target+'_full_corr_lcs.pdf',format='pdf')
+plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_full_corr_lcs.pdf',format='pdf')
 
 plt.show()
 print ("Done!")
