@@ -279,7 +279,7 @@ else:
                     max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
                     number_masked_regions = 1 #set to 1 at first
 
-                    if np.abs(np.max(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
+                    if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
                         redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
 
@@ -304,7 +304,7 @@ else:
                             if masked_cadence_limits[1] < len(tpf.time) -1:
                                 last_timestamp = tpf.time[masked_cadence_limits[1]]
                             else:
-                                last_timestamp = tpf.time[len(tpf.time)-1]
+                                last_timestamp = tpf.time[-1]
 
                             cadence_mask = ~((tpf.time > first_timestamp) & (tpf.time < last_timestamp))
 
@@ -313,18 +313,18 @@ else:
                             additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
                             additive_bkg_and_constant = additive_bkg.append_constant()
 
-                            print(np.abs(np.max(additive_bkg.values)))
+                            print(np.max(np.abs(additive_bkg.values)))
 
 
                             for i in range(0,max_masked_regions):
 
 
-                                if np.abs(np.max(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
+                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
 
                                     number_masked_regions += 1
 
                                     print('Systematics remain; define the next masked region.')
-                                    print(np.max(additive_bkg.values))
+                                    print(np.max(np.abs(additive_bkg.values)))
                                     fig_cm = plt.figure()
                                     ax_cm = fig_cm.add_subplot()
                                     ax_cm.plot(additive_bkg.values)
@@ -358,7 +358,7 @@ else:
 
                     # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
 
-                    r = lk.RegressionCorrector(lk.LightCurve(tpf.time, tpf.time.value*0))
+                    r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
 
                     corrected_pixels = []
                     for idx in range(allbright_mask.sum()):
@@ -475,7 +475,7 @@ else:
 #############################################
 #############################################
             else:
-
+#NEED TO FIX THIS SO THAT IT DOESN'T EXIT THE WHOLE PROGRAM WHEN YOU MOVE TO THE NEXT SECTOR NATURALLY; NOT MAKE A MISTAKE.
                 print('Selected data are not in desired Cycle.')
                 sys.exit()
 
