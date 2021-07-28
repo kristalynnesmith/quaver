@@ -11,9 +11,16 @@ import numpy as np
 
 #################
 #################
-import matplotlib
-import tkinter
-matplotlib.use("TkAgg")
+
+
+#THE FOLLOWING STATEMENTS MAY BE NEEDED IF RUNNING IN WINDOWS LINUX ENVIRONMENT:
+#(NOTE: adding these may cause a Tkinter deprecation warning, but should not affect performance.)
+
+#import matplotlib
+#import tkinter
+#matplotlib.use("TkAgg")
+
+
 ####################
 ###################
 
