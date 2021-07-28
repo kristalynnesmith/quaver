@@ -325,8 +325,9 @@ else:
 
                             for i in range(0,max_masked_regions):
 
+                                additive_bkg_values_exclude_last = additive_bkg.values[0:-2]  #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit if the end has been cut off in a previous mask.
 
-                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions-1:
+                                if np.max(np.abs(additive_bkg_values_exclude_last)) > 0.2  and number_masked_regions <= max_masked_regions-1:
 
                                     number_masked_regions += 1
 
@@ -334,7 +335,7 @@ else:
                                     print(np.max(np.abs(additive_bkg.values)))
                                     fig_cm = plt.figure()
                                     ax_cm = fig_cm.add_subplot()
-                                    ax_cm.plot(additive_bkg.values)
+                                    ax_cm.plot(additive_bkg.values[0:-2])       #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit.
 
                                     plt.title('Select first and last cadence to define mask region:')
                                     masked_cadence_limits = []
