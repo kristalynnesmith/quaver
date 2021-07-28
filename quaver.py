@@ -319,7 +319,7 @@ else:
                             for i in range(0,max_masked_regions):
 
 
-                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
+                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions-1:
 
                                     number_masked_regions += 1
 
@@ -336,24 +336,29 @@ else:
                                     plt.show()
                                     plt.close(fig_cm)
 
+                                    if len(masked_cadence_limits) != 0:
 
-                                    if masked_cadence_limits[0] >= 0:
-                                        first_timestamp = tpf.time[masked_cadence_limits[0]].value
+
+                                        if masked_cadence_limits[0] >= 0:
+                                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
+                                        else:
+                                            first_timestamp = 0
+                                        if masked_cadence_limits[1] < len(tpf.time) -1:
+                                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
+                                        else:
+                                            last_timestamp = tpf.time[-1].value
+
+
+                                        cadence_mask = ~((tpf.time.value > first_timestamp) & (tpf.time.value < last_timestamp))
+
+                                        tpf = tpf[cadence_mask]
+
+                                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                                        additive_bkg_and_constant = additive_bkg.append_constant()
+
                                     else:
-                                        first_timestamp = 0
-                                    if masked_cadence_limits[1] < len(tpf.time) -1:
-                                        last_timestamp = tpf.time[masked_cadence_limits[1]].value
-                                    else:
-                                        last_timestamp = tpf.time[-1].value
 
-
-                                    cadence_mask = ~((tpf.time.value > first_timestamp) & (tpf.time.value < last_timestamp))
-
-                                    tpf = tpf[cadence_mask]
-
-                                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
-                                    additive_bkg_and_constant = additive_bkg.append_constant()
-
+                                        number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
 
 
                     # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
