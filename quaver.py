@@ -140,6 +140,7 @@ if num_obs_sectors == 0:
 
     sys.exit()
 
+
 print(sector_data)
 print('\n')
 print('Table of Cycles by Sector:')
@@ -172,6 +173,21 @@ else:
     print('Invalid Cycle Number')
 
 
+list_observed_sectors = []
+list_observed_sectors_in_cycle = []
+list_sectordata_index_in_cycle = []
+
+for i in range(0,len(sector_data)):
+
+    sector_number = int(sector_data[i].mission[0][12:14])       #This will need to change, Y2K style, if TESS ever has more than 100 sectors.
+    list_observed_sectors.append(sector_number)
+
+    if sector_number >= first_sector and sector_number <= last_sector:
+
+        list_observed_sectors_in_cycle.append(sector_number)
+        list_sectordata_index_in_cycle.append(i)
+
+
 unstitched_lc_regression = []
 unstitched_lc_pca = []
 
@@ -182,315 +198,311 @@ if num_obs_sectors == 0:
 
 else:
 
-    for i in range(0,num_obs_sectors):
+    for i in range(0,len(list_sectordata_index_in_cycle)):
 
         try:
 
 
-            tpf = sector_data[i].download(cutout_size=(tpf_width_height, tpf_width_height)) #gets earliest sector
+            tpf = sector_data[list_sectordata_index_in_cycle[i]].download(cutout_size=(tpf_width_height, tpf_width_height)) #gets earliest sector
 
             sector_number = tpf.get_header()['SECTOR']
             sec = str(sector_number)
             ccd = tpf.get_header()['CCD']
             cam = tpf.get_header()['CAMERA']
 
-            if sector_number >= first_sector and sector_number <= last_sector:  #Check that this TPF is in the desired Cycle/year
-
-                print("Generating pixel map for sector "+sec+".\n")
-
-                #Check that this object is actually on silicon and getting data (not always the case just because TESSCut says so).
-                #By making a light curve from a dummy aperture of the middle 5x5 square and seeing if its mean flux is zero.
-
-                aper_dummy = np.zeros(tpf[0].shape[1:], dtype=bool) #blank
-                aper_dummy[int(tpf_width_height/2-3):int(tpf_width_height/2+3),int(tpf_width_height/2-3):int(tpf_width_height/2+3)] = True
-                lc_dummy = tpf.to_lightcurve(aperture_mask=aper_dummy)
-
-                # If there is no observation in this sector, there most likely won't be one in the next.
-                # No need to check through the rest of the sectors in this cycle.
 
 
-                if np.mean(lc_dummy.flux) != 0:
+            print("Generating pixel map for sector "+sec+".\n")
 
-                    hdu = tpf.get_header(ext=2)
+            #Check that this object is actually on silicon and getting data (not always the case just because TESSCut says so).
+            #By making a light curve from a dummy aperture of the middle 5x5 square and seeing if its mean flux is zero.
 
-                    #Get WCS information and flux stats of the TPF image.
-                    tpf_wcs = WCS(tpf.get_header(ext=2))
+            aper_dummy = np.zeros(tpf[0].shape[1:], dtype=bool) #blank
+            aper_dummy[int(tpf_width_height/2-3):int(tpf_width_height/2+3),int(tpf_width_height/2-3):int(tpf_width_height/2+3)] = True
+            lc_dummy = tpf.to_lightcurve(aperture_mask=aper_dummy)
 
-                    pixmin = np.min(tpf.flux[200]).value
-                    pixmax = np.max(tpf.flux[200]).value
-                    pixmean = np.mean(tpf.flux[200]).value
-
-                    temp_min = float(pixmin)
-                    # print(temp_min)
-                    temp_max = float(1e-3*pixmax+pixmean)
-                    # print(temp_max)
-
-                    #Create a blank boolean array for the aperture, which will turn to TRUE when pixels are selected.
-
-                    aper = np.zeros(tpf[0].shape[1:], dtype=bool) #blank
-                    aper_mod = aper.copy()       #For the source aperture
-                    aper_buffer = aper.copy()    #For the source aperture plus a buffer region to exclude from both additive and mult. regressors
-
-                    aper_width = tpf[0].shape[1]
-                    #Plot the TPF image and the DSS contours together, to help with aperture selection, along with the starter aperture.
-
-                    fig = plt.figure(figsize=(8,8))
-                    ax = fig.add_subplot(111,projection=tpf_wcs)
-                    # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
-                    ax.imshow(tpf.flux[200],vmin=temp_min,vmax=temp_max)
-                    ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=[0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax],colors='white',alpha=0.9)
-                    ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
-
-                    ax.set_xlim(-0.5,aper_width-0.5)  #This section is needed to fix the stupid plotting issue in Python 3.
-                    ax.set_ylim(-0.5,aper_width-0.5)
-
-                    plt.title('Define extraction pixels:')
-                    coords = []
-                    row_col_coords = []
-                    cid = fig.canvas.mpl_connect('button_press_event',onclick)
-
-                    plt.show()
-                    plt.close(fig)
-
-                    fig.canvas.mpl_disconnect(cid)
-
-                    for i in range(0,len(row_col_coords)):
-
-                        aper_mod[row_col_coords[i]] = True
-
-                        min_coord_index = np.min(row_col_coords)
-                        max_coord_index = np.max(row_col_coords)
-                        aper_buffer[min_coord_index:max_coord_index,min_coord_index:max_coord_index] = True
+            # If there is no observation in this sector, there most likely won't be one in the next.
+            # No need to check through the rest of the sectors in this cycle.
 
 
-                    #Create a mask that finds all of the bright, source-containing regions of the TPF.
-                    #Need to change to prevent requiring contiguous mask:
-                    '''
-                    thumb = np.nanpercentile(tpf.flux, 95, axis=0)
-                    thumb -= np.nanpercentile(thumb, 20)
-                    allbright_mask = thumb > np.percentile(thumb, 40)
-                    '''
-                    allbright_mask = tpf.create_threshold_mask(threshold=1.5,reference_pixel=None)
-                    allfaint_mask = ~allbright_mask
+            if np.mean(lc_dummy.flux) != 0:
 
-                    allbright_mask &= ~aper_buffer
-                    allfaint_mask &= ~aper_buffer
+                hdu = tpf.get_header(ext=2)
 
-                    #New attempt to get the additive background first:
+                #Get WCS information and flux stats of the TPF image.
+                tpf_wcs = WCS(tpf.get_header(ext=2))
 
-                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
-                    additive_bkg_and_constant = additive_bkg.append_constant()
+                pixmin = np.min(tpf.flux[200]).value
+                pixmax = np.max(tpf.flux[200]).value
+                pixmean = np.mean(tpf.flux[200]).value
 
-                    #Add a module to catch possible major systematics that need to be masked out before continuuing:
+                temp_min = float(pixmin)
+                # print(temp_min)
+                temp_max = float(1e-3*pixmax+pixmean)
+                # print(temp_max)
 
-                    max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
-                    number_masked_regions = 1 #set to 1 at first
+                #Create a blank boolean array for the aperture, which will turn to TRUE when pixels are selected.
 
-                    if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
+                aper = np.zeros(tpf[0].shape[1:], dtype=bool) #blank
+                aper_mod = aper.copy()       #For the source aperture
+                aper_buffer = aper.copy()    #For the source aperture plus a buffer region to exclude from both additive and mult. regressors
 
-                        redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
+                aper_width = tpf[0].shape[1]
+                #Plot the TPF image and the DSS contours together, to help with aperture selection, along with the starter aperture.
 
-                        if redo_with_mask == 'Y' or redo_with_mask=='y' or redo_with_mask=='YES' or redo_with_mask=='yes':
+                fig = plt.figure(figsize=(8,8))
+                ax = fig.add_subplot(111,projection=tpf_wcs)
+                # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
+                ax.imshow(tpf.flux[200],vmin=temp_min,vmax=temp_max)
+                ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=[0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax],colors='white',alpha=0.9)
+                ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
 
+                ax.set_xlim(-0.5,aper_width-0.5)  #This section is needed to fix the stupid plotting issue in Python 3.
+                ax.set_ylim(-0.5,aper_width-0.5)
 
-                            fig_cm = plt.figure()
-                            ax_cm = fig_cm.add_subplot()
-                            ax_cm.plot(additive_bkg.values)
+                plt.title('Define extraction pixels:')
+                coords = []
+                row_col_coords = []
+                cid = fig.canvas.mpl_connect('button_press_event',onclick)
 
-                            plt.title('Select first and last cadence to define mask region:')
-                            masked_cadence_limits = []
-                            cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
+                plt.show()
+                plt.close(fig)
 
-                            plt.show()
-                            plt.close(fig_cm)
+                fig.canvas.mpl_disconnect(cid)
 
-                            if masked_cadence_limits[0] >= 0:
-                                first_timestamp = tpf.time[masked_cadence_limits[0]]
-                            else:
-                                first_timestamp = 0
-                            if masked_cadence_limits[1] < len(tpf.time) -1:
-                                last_timestamp = tpf.time[masked_cadence_limits[1]]
-                            else:
-                                last_timestamp = tpf.time[-1]
+                for i in range(0,len(row_col_coords)):
 
-                            cadence_mask = ~((tpf.time > first_timestamp) & (tpf.time < last_timestamp))
+                    aper_mod[row_col_coords[i]] = True
 
-                            tpf = tpf[cadence_mask]
-
-                            additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
-                            additive_bkg_and_constant = additive_bkg.append_constant()
-
-                            print(np.max(np.abs(additive_bkg.values)))
+                    min_coord_index = np.min(row_col_coords)
+                    max_coord_index = np.max(row_col_coords)
+                    aper_buffer[min_coord_index:max_coord_index,min_coord_index:max_coord_index] = True
 
 
-                            for i in range(0,max_masked_regions):
+                #Create a mask that finds all of the bright, source-containing regions of the TPF.
+                #Need to change to prevent requiring contiguous mask:
+                '''
+                thumb = np.nanpercentile(tpf.flux, 95, axis=0)
+                thumb -= np.nanpercentile(thumb, 20)
+                allbright_mask = thumb > np.percentile(thumb, 40)
+                '''
+                allbright_mask = tpf.create_threshold_mask(threshold=1.5,reference_pixel=None)
+                allfaint_mask = ~allbright_mask
 
-                                additive_bkg_values_exclude_last = additive_bkg.values[0:-2]  #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit if the end has been cut off in a previous mask.
+                allbright_mask &= ~aper_buffer
+                allfaint_mask &= ~aper_buffer
 
-                                if np.max(np.abs(additive_bkg_values_exclude_last)) > 0.2  and number_masked_regions <= max_masked_regions-1:
+                #New attempt to get the additive background first:
 
-                                    number_masked_regions += 1
+                additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                additive_bkg_and_constant = additive_bkg.append_constant()
 
-                                    print('Systematics remain; define the next masked region.')
-                                    print(np.max(np.abs(additive_bkg.values)))
-                                    fig_cm = plt.figure()
-                                    ax_cm = fig_cm.add_subplot()
-                                    ax_cm.plot(additive_bkg.values[0:-2])       #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit.
+                #Add a module to catch possible major systematics that need to be masked out before continuuing:
 
-                                    plt.title('Select first and last cadence to define mask region:')
-                                    masked_cadence_limits = []
-                                    cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
+                max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
+                number_masked_regions = 1 #set to 1 at first
 
-                                    plt.show()
-                                    plt.close(fig_cm)
+                if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
-                                    if len(masked_cadence_limits) != 0:
+                    redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
 
-
-                                        if masked_cadence_limits[0] >= 0:
-                                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
-                                        else:
-                                            first_timestamp = 0
-                                        if masked_cadence_limits[1] < len(tpf.time) -1:
-                                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
-                                        else:
-                                            last_timestamp = tpf.time[-1].value
+                    if redo_with_mask == 'Y' or redo_with_mask=='y' or redo_with_mask=='YES' or redo_with_mask=='yes':
 
 
-                                        cadence_mask = ~((tpf.time.value > first_timestamp) & (tpf.time.value < last_timestamp))
+                        fig_cm = plt.figure()
+                        ax_cm = fig_cm.add_subplot()
+                        ax_cm.plot(additive_bkg.values)
 
-                                        tpf = tpf[cadence_mask]
+                        plt.title('Select first and last cadence to define mask region:')
+                        masked_cadence_limits = []
+                        cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
 
-                                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
-                                        additive_bkg_and_constant = additive_bkg.append_constant()
+                        plt.show()
+                        plt.close(fig_cm)
 
+                        if masked_cadence_limits[0] >= 0:
+                            first_timestamp = tpf.time[masked_cadence_limits[0]]
+                        else:
+                            first_timestamp = 0
+                        if masked_cadence_limits[1] < len(tpf.time) -1:
+                            last_timestamp = tpf.time[masked_cadence_limits[1]]
+                        else:
+                            last_timestamp = tpf.time[-1]
+
+                        cadence_mask = ~((tpf.time > first_timestamp) & (tpf.time < last_timestamp))
+
+                        tpf = tpf[cadence_mask]
+
+                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                        additive_bkg_and_constant = additive_bkg.append_constant()
+
+                        print(np.max(np.abs(additive_bkg.values)))
+
+
+                        for i in range(0,max_masked_regions):
+
+                            additive_bkg_values_exclude_last = additive_bkg.values[0:-2]  #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit if the end has been cut off in a previous mask.
+
+                            if np.max(np.abs(additive_bkg_values_exclude_last)) > 0.2  and number_masked_regions <= max_masked_regions-1:
+
+                                number_masked_regions += 1
+
+                                print('Systematics remain; define the next masked region.')
+                                print(np.max(np.abs(additive_bkg.values)))
+                                fig_cm = plt.figure()
+                                ax_cm = fig_cm.add_subplot()
+                                ax_cm.plot(additive_bkg.values[0:-2])       #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit.
+
+                                plt.title('Select first and last cadence to define mask region:')
+                                masked_cadence_limits = []
+                                cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
+
+                                plt.show()
+                                plt.close(fig_cm)
+
+                                if len(masked_cadence_limits) != 0:
+
+
+                                    if masked_cadence_limits[0] >= 0:
+                                        first_timestamp = tpf.time[masked_cadence_limits[0]].value
                                     else:
-
-                                        number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
-
-
-                    # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
-
-                    r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
-
-                    corrected_pixels = []
-                    for idx in range(allbright_mask.sum()):
-                        r.lc.flux = tpf.flux[:, allbright_mask][:, idx]
-                        r.correct(additive_bkg_and_constant)
-                        corrected_pixels.append(r.corrected_lc.flux)
-
-                    #Getting the multiplicative effects now from the bright pixels that have been corrected for additive effects.
-                    multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(3)
-
-                    #Create a higher order version of the additive effects:
-                    additive_bkg_squared = deepcopy(additive_bkg)
-                    additive_bkg_squared.df = additive_bkg_squared.df**2
-
-                    #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
-
-                    dm = lk.DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
-
-                    #Now get the raw light curve.
-                    lc = tpf.to_lightcurve(aperture_mask=aper_mod)
-                #  lc = lc[lc.flux_err > 0]        #This was suggested by an error message to prevent the "flux uncertainties" problem.
-
-                    #Replace any errors that are zero or negative with the mean error:
-
-                    mean_error = np.mean(lc.flux_err[np.isfinite(lc.flux_err)])
-                    lc.flux_err = np.where(lc.flux_err == 0,mean_error,lc.flux_err)
-                    lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
-
-                    #And correct it:
-                    clc = lk.RegressionCorrector(lc).correct(dm)
-
-                    #Now we begin the simpler method of using 5 PCA components, with no hybrid matrix:
-
-                    raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
-
-                    #Replace any errors that are zero or negative with the mean error:
-                    raw_lc_OF.flux_err = np.where(raw_lc_OF.flux_err == 0,mean_error,raw_lc_OF.flux_err)
-                    raw_lc_OF.flux_err = np.where(raw_lc_OF.flux_err < 0,mean_error,raw_lc_OF.flux_err)
-                    raw_lc_OF.flux_err = np.where(np.isnan(raw_lc_OF.flux_err)==True,mean_error,raw_lc_OF.flux_err)
-
-                #    raw_lc_OF = raw_lc_OF[raw_lc_OF.flux_err > 0]   #This was suggested by an error message to prevent the "flux uncertainties" problem.
-                    regressors_OF = tpf.flux[:,~aper_mod]
-
-                    dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
-                    dm_pca5_OF = dm_OF.pca(3)
-                    dm_pca5_OF = dm_pca5_OF.append_constant()
-                    corrector_pca5_OF = lk.RegressionCorrector(raw_lc_OF)
-                    corrected_lc_pca5_OF = corrector_pca5_OF.correct(dm_pca5_OF)
-
-                #    model_pca5_OF = corrector_pca5_OF.model_lc
-                    #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
-                #    corrected_lc_pca5_OF = raw_lc_OF - model_pca5_OF
-
-                    #AND PLOT THE CORRECTED LIGHT CURVES, BOTH METHODS TOGETHER:
-                    #Want to also add the mult/add component plots and the aperture plot!
+                                        first_timestamp = 0
+                                    if masked_cadence_limits[1] < len(tpf.time) -1:
+                                        last_timestamp = tpf.time[masked_cadence_limits[1]].value
+                                    else:
+                                        last_timestamp = tpf.time[-1].value
 
 
-                    fig2 = plt.figure(figsize=(12,8))
-                    gs = gridspec.GridSpec(ncols=3, nrows=3,wspace=0.5,hspace=0.5,width_ratios=[1,1,2])
-                    f_ax1 = fig2.add_subplot(gs[0, :])
-                    f_ax1.set_title(target+': Corrected Light Curves')
-                    f_ax2 = fig2.add_subplot(gs[1, :-1])
-                    f_ax2.set_title('Additive Components')
-                    f_ax3 = fig2.add_subplot(gs[2:,:-1])
-                    f_ax3.set_title('Multiplicative Components')
-                    f_ax4 = fig2.add_subplot(gs[1:,-1])
-                    #f_ax4.set_title('Aperture')
+                                    cadence_mask = ~((tpf.time.value > first_timestamp) & (tpf.time.value < last_timestamp))
 
-                    clc.plot(ax=f_ax1,label='Hybrid Method')
-                    corrected_lc_pca5_OF.plot(ax=f_ax1,label='PCA5 Simple')
+                                    tpf = tpf[cadence_mask]
 
-                    f_ax2.plot(additive_bkg.values)
-                    f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
+                                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                                    additive_bkg_and_constant = additive_bkg.append_constant()
 
-                    tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
+                                else:
 
-                    # print("\n")
-                    print("\nMade lightcurve and aperture selection.\n")
+                                    number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
 
-                    ### Keeping track of what relative sector is being observed, keeps figures from experiencing FileExistsError
-                    ## This section creates individual directories for each object in which the quaver procesed light curve data is stored
-                    ##  then saves the corrected lightcurves along with additive and multiplicative components as well as the aperture selection
+
+                # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
+
+                r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
+
+                corrected_pixels = []
+                for idx in range(allbright_mask.sum()):
+                    r.lc.flux = tpf.flux[:, allbright_mask][:, idx]
+                    r.correct(additive_bkg_and_constant)
+                    corrected_pixels.append(r.corrected_lc.flux)
+
+                #Getting the multiplicative effects now from the bright pixels that have been corrected for additive effects.
+                multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(3)
+
+                #Create a higher order version of the additive effects:
+                additive_bkg_squared = deepcopy(additive_bkg)
+                additive_bkg_squared.df = additive_bkg_squared.df**2
+
+                #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
+
+                dm = lk.DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
+
+                #Now get the raw light curve.
+                lc = tpf.to_lightcurve(aperture_mask=aper_mod)
+            #  lc = lc[lc.flux_err > 0]        #This was suggested by an error message to prevent the "flux uncertainties" problem.
+
+                #Replace any errors that are zero or negative with the mean error:
+
+                mean_error = np.mean(lc.flux_err[np.isfinite(lc.flux_err)])
+                lc.flux_err = np.where(lc.flux_err == 0,mean_error,lc.flux_err)
+                lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
+
+                #And correct it:
+                clc = lk.RegressionCorrector(lc).correct(dm)
+
+                #Now we begin the simpler method of using 5 PCA components, with no hybrid matrix:
+
+                raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
+
+                #Replace any errors that are zero or negative with the mean error:
+                raw_lc_OF.flux_err = np.where(raw_lc_OF.flux_err == 0,mean_error,raw_lc_OF.flux_err)
+                raw_lc_OF.flux_err = np.where(raw_lc_OF.flux_err < 0,mean_error,raw_lc_OF.flux_err)
+                raw_lc_OF.flux_err = np.where(np.isnan(raw_lc_OF.flux_err)==True,mean_error,raw_lc_OF.flux_err)
+
+            #    raw_lc_OF = raw_lc_OF[raw_lc_OF.flux_err > 0]   #This was suggested by an error message to prevent the "flux uncertainties" problem.
+                regressors_OF = tpf.flux[:,~aper_mod]
+
+                dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
+                dm_pca5_OF = dm_OF.pca(3)
+                dm_pca5_OF = dm_pca5_OF.append_constant()
+                corrector_pca5_OF = lk.RegressionCorrector(raw_lc_OF)
+                corrected_lc_pca5_OF = corrector_pca5_OF.correct(dm_pca5_OF)
+
+            #    model_pca5_OF = corrector_pca5_OF.model_lc
+                #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
+            #    corrected_lc_pca5_OF = raw_lc_OF - model_pca5_OF
+
+                #AND PLOT THE CORRECTED LIGHT CURVES, BOTH METHODS TOGETHER:
+                #Want to also add the mult/add component plots and the aperture plot!
+
+
+                fig2 = plt.figure(figsize=(12,8))
+                gs = gridspec.GridSpec(ncols=3, nrows=3,wspace=0.5,hspace=0.5,width_ratios=[1,1,2])
+                f_ax1 = fig2.add_subplot(gs[0, :])
+                f_ax1.set_title(target+': Corrected Light Curves')
+                f_ax2 = fig2.add_subplot(gs[1, :-1])
+                f_ax2.set_title('Additive Components')
+                f_ax3 = fig2.add_subplot(gs[2:,:-1])
+                f_ax3.set_title('Multiplicative Components')
+                f_ax4 = fig2.add_subplot(gs[1:,-1])
+                #f_ax4.set_title('Aperture')
+
+                clc.plot(ax=f_ax1,label='Hybrid Method')
+                corrected_lc_pca5_OF.plot(ax=f_ax1,label='PCA5 Simple')
+
+                f_ax2.plot(additive_bkg.values)
+                f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
+
+                tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
+
+                # print("\n")
+                print("\nMade lightcurve and aperture selection.\n")
+
+                ### Keeping track of what relative sector is being observed, keeps figures from experiencing FileExistsError
+                ## This section creates individual directories for each object in which the quaver procesed light curve data is stored
+                ##  then saves the corrected lightcurves along with additive and multiplicative components as well as the aperture selection
 
 ###############################################################################
 ##############################################################################
-                    directory = str(target).replace(" ","")
-                    target_safename = target.replace(" ","")
-                    try:
-                        os.makedirs('regression_program_output/'+target_safename)
-                        print("Directory '% s' created\n" % directory)
-                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
-                        plt.show()
-                    except FileExistsError:
-                        print("Saving to folder '% s'\n" % directory)
-                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
-                        plt.show()
+                directory = str(target).replace(" ","")
+                target_safename = target.replace(" ","")
+                try:
+                    os.makedirs('regression_program_output/'+target_safename)
+                    print("Directory '% s' created\n" % directory)
+                    plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                    plt.show()
+                except FileExistsError:
+                    print("Saving to folder '% s'\n" % directory)
+                    plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                    plt.show()
 ##################################################################################
 ###############################################################################
 
 
 
-                    regression_corrected_lc = np.column_stack((clc.time.value,clc.flux.value,clc.flux_err.value))
-                    pca_corrected_lc = np.column_stack((corrected_lc_pca5_OF.time.value,corrected_lc_pca5_OF.flux.value,corrected_lc_pca5_OF.flux_err.value))
+                regression_corrected_lc = np.column_stack((clc.time.value,clc.flux.value,clc.flux_err.value))
+                pca_corrected_lc = np.column_stack((corrected_lc_pca5_OF.time.value,corrected_lc_pca5_OF.flux.value,corrected_lc_pca5_OF.flux_err.value))
 
-                    unstitched_lc_regression.append(regression_corrected_lc)
-                    unstitched_lc_pca.append(pca_corrected_lc)
+                unstitched_lc_regression.append(regression_corrected_lc)
+                unstitched_lc_pca.append(pca_corrected_lc)
 
-                    print("Sector, CCD, camera: ")
-                    print(sector_number,ccd,cam)
+                print("Sector, CCD, camera: ")
+                print(sector_number,ccd,cam)
 
 #############################################
 #############################################
-                    print("\nMoving to next sector.\n")
+                print("\nMoving to next sector.\n")
 #############################################
 #############################################
-            else:
-#NEED TO FIX THIS SO THAT IT DOESN'T EXIT THE WHOLE PROGRAM WHEN YOU MOVE TO THE NEXT SECTOR NATURALLY; NOT MAKE A MISTAKE.
-                print('Selected data are not in desired Cycle.')
-                sys.exit()
 
         # If target coordinates are too close to edge on approach, this will skip that sector and read the next.
         # If target coordinates are too close to edge on exit, this will skip that sector and break on the next loop.
