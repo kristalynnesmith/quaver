@@ -300,7 +300,6 @@ else:
                 #Add a module to catch possible major systematics that need to be masked out before continuuing:
 
                 max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
-                number_masked_regions = 1 #set to 1 at first
 
                 if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
@@ -308,6 +307,7 @@ else:
 
                     if redo_with_mask == 'Y' or redo_with_mask=='y' or redo_with_mask=='YES' or redo_with_mask=='yes':
 
+                        number_masked_regions = 1 #set to 1 at first, for this mask.
 
                         fig_cm = plt.figure()
                         ax_cm = fig_cm.add_subplot()
@@ -329,7 +329,7 @@ else:
                         else:
                             last_timestamp = tpf.time[-1]
 
-                        cadence_mask = ~((tpf.time > first_timestamp) & (tpf.time < last_timestamp))
+                        cadence_mask = ~((tpf.time >= first_timestamp) & (tpf.time <= last_timestamp))
 
                         tpf = tpf[cadence_mask]
 
@@ -341,9 +341,7 @@ else:
 
                         for i in range(0,max_masked_regions):
 
-                            additive_bkg_values_exclude_last = additive_bkg.values[0:-2]  #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit if the end has been cut off in a previous mask.
-
-                            if np.max(np.abs(additive_bkg_values_exclude_last)) > 0.2  and number_masked_regions <= max_masked_regions-1:
+                            if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
 
                                 number_masked_regions += 1
 
@@ -351,7 +349,7 @@ else:
                                 print(np.max(np.abs(additive_bkg.values)))
                                 fig_cm = plt.figure()
                                 ax_cm = fig_cm.add_subplot()
-                                ax_cm.plot(additive_bkg.values[0:-2])       #Leaves off the final cadence, which is always blown up large by the final additive design matrix fit.
+                                ax_cm.plot(additive_bkg.values)       
 
                                 plt.title('Select first and last cadence to define mask region:')
                                 masked_cadence_limits = []
@@ -373,7 +371,7 @@ else:
                                         last_timestamp = tpf.time[-1].value
 
 
-                                    cadence_mask = ~((tpf.time.value > first_timestamp) & (tpf.time.value < last_timestamp))
+                                    cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
 
                                     tpf = tpf[cadence_mask]
 
@@ -434,6 +432,7 @@ else:
                 dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
                 dm_pca5_OF = dm_OF.pca(3)
                 dm_pca5_OF = dm_pca5_OF.append_constant()
+
                 corrector_pca5_OF = lk.RegressionCorrector(raw_lc_OF)
                 corrected_lc_pca5_OF = corrector_pca5_OF.correct(dm_pca5_OF)
 
