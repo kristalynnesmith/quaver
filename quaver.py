@@ -292,6 +292,25 @@ else:
                 allbright_mask &= ~aper_buffer
                 allfaint_mask &= ~aper_buffer
 
+                #Remove any empty flux arrays from the downloaded TPF before we even get started:
+
+                boolean_orignans = []
+
+                for i in range(0,len(tpf.flux)):
+
+                    if np.sum(tpf.flux[i] == 0) or np.isnan(np.sum(tpf.flux[i])) == True:
+
+                        nanflag = True
+
+                    else:
+
+                        nanflag = False
+
+                    boolean_orignans.append(nanflag)
+
+                boolean_orignans_array = np.array(boolean_orignans)
+                tpf = tpf[~boolean_orignans_array]
+
                 #New attempt to get the additive background first:
 
                 additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
@@ -349,7 +368,7 @@ else:
                                 print(np.max(np.abs(additive_bkg.values)))
                                 fig_cm = plt.figure()
                                 ax_cm = fig_cm.add_subplot()
-                                ax_cm.plot(additive_bkg.values)       
+                                ax_cm.plot(additive_bkg.values)
 
                                 plt.title('Select first and last cadence to define mask region:')
                                 masked_cadence_limits = []
