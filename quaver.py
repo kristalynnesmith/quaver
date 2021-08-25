@@ -1,3 +1,4 @@
+
 ######
 ######
 import os
@@ -16,9 +17,9 @@ import numpy as np
 #THE FOLLOWING STATEMENTS MAY BE NEEDED IF RUNNING IN WINDOWS LINUX ENVIRONMENT:
 #(NOTE: adding these may cause a Tkinter deprecation warning, but should not affect performance.)
 
-#import matplotlib
-#import tkinter
-#matplotlib.use("TkAgg")
+import matplotlib
+import tkinter
+matplotlib.use("TkAgg")
 
 
 ####################
@@ -318,7 +319,7 @@ else:
 
                 #Add a module to catch possible major systematics that need to be masked out before continuuing:
 
-                max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
+                max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
 
                 if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
@@ -340,15 +341,15 @@ else:
                         plt.close(fig_cm)
 
                         if masked_cadence_limits[0] >= 0:
-                            first_timestamp = tpf.time[masked_cadence_limits[0]]
+                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
                         else:
                             first_timestamp = 0
                         if masked_cadence_limits[1] < len(tpf.time) -1:
-                            last_timestamp = tpf.time[masked_cadence_limits[1]]
+                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
                         else:
-                            last_timestamp = tpf.time[-1]
+                            last_timestamp = tpf.time[-1].value
 
-                        cadence_mask = ~((tpf.time >= first_timestamp) & (tpf.time <= last_timestamp))
+                        cadence_mask = ~((tpf.time.value >= float(first_timestamp)) & (tpf.time.value <= float(last_timestamp)))
 
                         tpf = tpf[cadence_mask]
 
@@ -494,13 +495,13 @@ else:
                 directory = str(target).replace(" ","")
                 target_safename = target.replace(" ","")
                 try:
-                    os.makedirs('regression_program_output/'+target_safename)
+                    os.makedirs('../regression_program_output/'+target_safename)
                     print("Directory '% s' created\n" % directory)
                     plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
                     plt.show()
                 except FileExistsError:
                     print("Saving to folder '% s'\n" % directory)
-                    plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
+                    plt.savefig('../regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
                     plt.show()
 ##################################################################################
 ###############################################################################
@@ -652,8 +653,8 @@ for i in range(0,1-len(full_lc_time_pca)):
 regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
 pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_hybrid_regressed_lc.dat',regression_lc)
-np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_pca5_lc.dat',pca5_lc)
+np.savetxt('../regression_program_output/'+target_safename+'/'+target_safename+'_full_hybrid_regressed_lc.dat',regression_lc)
+np.savetxt('../regression_program_output/'+target_safename+'/'+target_safename+'_full_pca5_lc.dat',pca5_lc)
 
 
 
@@ -670,7 +671,7 @@ for i in range(0,len(unstitched_lc_regression)):
 
     plt.axvline(x=last_time,color='k',linestyle='--')
 
-plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_full_corr_lcs.pdf',format='pdf')
+plt.savefig('../regression_program_output/'+target_safename+'/'+target_safename+'_full_corr_lcs.pdf',format='pdf')
 
 plt.show()
 print ("Done!")
