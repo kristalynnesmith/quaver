@@ -43,17 +43,21 @@ def onclick(event):
     global ix,iy
     ix,iy = int(round(event.xdata)),int(round(event.ydata))
 
-    global coords
-    coords.append((ix,iy))
-
     global row_col_coords
-    row_col_coords.append((iy,ix))
 
-    #plt.plot(event.xdata,event.ydata,marker=u"$\u2713$",color='limegreen',markersize=9)
-    plt.plot(ix,iy,marker=u"$\u2713$",color='red',markersize=9)
-    fig.canvas.draw()
+    if (iy,ix) in row_col_coords:
+        row_col_coords.remove((iy,ix))
+        plt.plot(ix,iy,marker="x",color='red',markersize=9)
+        fig.canvas.draw()
 
-    print(ix,iy)
+        print('removing'+str((ix,iy)))
+    else:
+        row_col_coords.append((iy,ix))
+        plt.plot(ix,iy,marker=u"$\u2713$",color='limegreen',markersize=9)
+        fig.canvas.draw()
+
+        print('adding'+str((ix,iy)))
+
 #############################################
 
 
@@ -261,7 +265,6 @@ else:
                 ax.set_ylim(-0.5,aper_width-0.5)
 
                 plt.title('Define extraction pixels:')
-                coords = []
                 row_col_coords = []
                 cid = fig.canvas.mpl_connect('button_press_event',onclick)
 
