@@ -153,43 +153,50 @@ print('Cycle 2: Sectors 14-26')
 print('Cycle 3: Sectors 27-39')
 print('Cycle 4: Sectors 40-55')
 
-#Set cycle of interest:
+#Set cycle of interest, while making sure the chosen cycle corresponds to actual observed sectors:
 
-cycle = int(input('Enter Cycle: '))
+check_cycle = False
+
+while check_cycle == False:
+
+    cycle = int(input('Enter Cycle: '))
+
+    first_sectors = [1,14,27,40]
+    last_sectors = [13,26,39,55]
+
+    if cycle == 1:
+        first_sector = first_sectors[0]
+        last_sector = last_sectors[0]
+    elif cycle ==2:
+        first_sector = first_sectors[1]
+        last_sector = last_sectors[1]
+    elif cycle ==3:
+        first_sector = first_sectors[2]
+        last_sector = last_sectors[2]
+    elif cycle==4:
+        first_sector = first_sectors[3]
+        last_sector = last_sectors[2]
+    else:
+        print('Invalid Cycle Number')
 
 
-first_sectors = [1,14,27,40]
-last_sectors = [13,26,39,55]
+    list_observed_sectors = []
+    list_observed_sectors_in_cycle = []
+    list_sectordata_index_in_cycle = []
 
-if cycle == 1:
-    first_sector = first_sectors[0]
-    last_sector = last_sectors[0]
-elif cycle ==2:
-    first_sector = first_sectors[1]
-    last_sector = last_sectors[1]
-elif cycle ==3:
-    first_sector = first_sectors[2]
-    last_sector = last_sectors[2]
-elif cycle==4:
-    first_sector = first_sectors[3]
-    last_sector = last_sectors[2]
-else:
-    print('Invalid Cycle Number')
+    for i in range(0,len(sector_data)):
 
+        sector_number = int(sector_data[i].mission[0][12:14])       #This will need to change, Y2K style, if TESS ever has more than 100 sectors.
+        list_observed_sectors.append(sector_number)
 
-list_observed_sectors = []
-list_observed_sectors_in_cycle = []
-list_sectordata_index_in_cycle = []
+        if sector_number >= first_sector and sector_number <= last_sector:
 
-for i in range(0,len(sector_data)):
+            list_observed_sectors_in_cycle.append(sector_number)
+            list_sectordata_index_in_cycle.append(i)
 
-    sector_number = int(sector_data[i].mission[0][12:14])       #This will need to change, Y2K style, if TESS ever has more than 100 sectors.
-    list_observed_sectors.append(sector_number)
-
-    if sector_number >= first_sector and sector_number <= last_sector:
-
-        list_observed_sectors_in_cycle.append(sector_number)
-        list_sectordata_index_in_cycle.append(i)
+    check_cycle = any(i>first_sector and i<last_sector for i in list_observed_sectors)
+    if check_cycle == False:
+        print('Selected cycle does not correspond to any observed sectors. Try again.')
 
 
 unstitched_lc_regression = []
