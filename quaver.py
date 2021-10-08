@@ -286,13 +286,28 @@ else:
 
                 fig.canvas.mpl_disconnect(cid)
 
+                buffer_pixels = []
+
                 for i in range(0,len(row_col_coords)):
 
                     aper_mod[row_col_coords[i]] = True
 
-                    min_coord_index = np.min(row_col_coords)
-                    max_coord_index = np.max(row_col_coords)
-                    aper_buffer[min_coord_index:max_coord_index,min_coord_index:max_coord_index] = True
+                    row_same_up_column = (row_col_coords[i][0],row_col_coords[i][1]+1)
+                    row_same_down_column = (row_col_coords[i][0],row_col_coords[i][1]-1)
+                    column_same_down_row = (row_col_coords[i][0]-1,row_col_coords[i][1])
+                    column_same_up_row = (row_col_coords[i][0]+1,row_col_coords[i][1])
+
+                    bottom_left_corner = (row_col_coords[i][0]-1,row_col_coords[i][1]-1)
+                    top_right_corner = (row_col_coords[i][0]+1,row_col_coords[i][1]+1)
+                    top_left_corner = (row_col_coords[i][0]+1,row_col_coords[i][1]-1)
+                    bottom_right_corner = (row_col_coords[i][0]-1,row_col_coords[i][1]+1)
+
+                    buffer_line = (row_same_up_column,row_same_down_column,column_same_up_row,column_same_down_row,top_left_corner,top_right_corner,bottom_left_corner,bottom_right_corner)
+                    buffer_pixels.append(buffer_line)
+
+                    for coord_set in buffer_line:
+                            aper_buffer[coord_set[0],coord_set[1]]=True
+
 
 
                 #Create a mask that finds all of the bright, source-containing regions of the TPF.
