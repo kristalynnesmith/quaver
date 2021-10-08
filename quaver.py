@@ -37,6 +37,12 @@ from matplotlib import patches
 import sys
 
 ############################################
+#User-settings: Number of PCA Components in the Hybrid method and simple PCA correction.
+additive_pca_num = 3
+multiplicative_pca_num = 3
+pca_only_num = 3
+
+############################################
 #Define function to record the positions of clicks in the pixel array image for the extraction mask.
 def onclick(event):
 
@@ -84,7 +90,7 @@ def onclick_cm(event):
 
 #Set the dimension of the downloaded TPF (currently only works for squares):
 
-tpf_width_height = 26
+tpf_width_height = 15
 
 #Define target and obtain DSS image from coordinates.
 
@@ -323,7 +329,9 @@ else:
 
                 #New attempt to get the additive background first:
 
-                additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                additive_hybrid_pcas = additive_pca_num
+
+                additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                 additive_bkg_and_constant = additive_bkg.append_constant()
 
                 #Add a module to catch possible major systematics that need to be masked out before continuuing:
@@ -362,7 +370,7 @@ else:
 
                         tpf = tpf[cadence_mask]
 
-                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                         additive_bkg_and_constant = additive_bkg.append_constant()
 
                         print(np.max(np.abs(additive_bkg.values)))
@@ -404,7 +412,7 @@ else:
 
                                     tpf = tpf[cadence_mask]
 
-                                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(3)
+                                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                                     additive_bkg_and_constant = additive_bkg.append_constant()
 
                                 else:
@@ -423,7 +431,9 @@ else:
                     corrected_pixels.append(r.corrected_lc.flux)
 
                 #Getting the multiplicative effects now from the bright pixels that have been corrected for additive effects.
-                multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(3)
+
+                multiplicative_hybrid_pcas = multiplicative_pca_num
+                multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(multiplicative_hybrid_pcas)
 
                 #Create a higher order version of the additive effects:
                 additive_bkg_squared = deepcopy(additive_bkg)
@@ -446,7 +456,7 @@ else:
                 #And correct it:
                 clc = lk.RegressionCorrector(lc).correct(dm)
 
-                #Now we begin the simpler method of using 5 PCA components, with no hybrid matrix:
+                #Now we begin the simpler method of using PCA components, with no hybrid matrix:
 
                 raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
 
@@ -458,12 +468,14 @@ else:
             #    raw_lc_OF = raw_lc_OF[raw_lc_OF.flux_err > 0]   #This was suggested by an error message to prevent the "flux uncertainties" problem.
                 regressors_OF = tpf.flux[:,~aper_mod]
 
-                dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
-                dm_pca5_OF = dm_OF.pca(3)
-                dm_pca5_OF = dm_pca5_OF.append_constant()
+                number_of_pcas = pca_only_num
 
-                corrector_pca5_OF = lk.RegressionCorrector(raw_lc_OF)
-                corrected_lc_pca5_OF = corrector_pca5_OF.correct(dm_pca5_OF)
+                dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
+                dm_pca_OF = dm_OF.pca(pca_only_num)
+                dm_pca_OF = dm_pca_OF.append_constant()
+
+                corrector_pca_OF = lk.RegressionCorrector(raw_lc_OF)
+                corrected_lc_pca_OF = corrector_pca_OF.correct(dm_pca_OF)
 
             #    model_pca5_OF = corrector_pca5_OF.model_lc
                 #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
@@ -485,7 +497,7 @@ else:
                 #f_ax4.set_title('Aperture')
 
                 clc.plot(ax=f_ax1,label='Hybrid Method')
-                corrected_lc_pca5_OF.plot(ax=f_ax1,label='PCA5 Simple')
+                corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
 
                 f_ax2.plot(additive_bkg.values)
                 f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
@@ -518,7 +530,7 @@ else:
 
 
                 regression_corrected_lc = np.column_stack((clc.time.value,clc.flux.value,clc.flux_err.value))
-                pca_corrected_lc = np.column_stack((corrected_lc_pca5_OF.time.value,corrected_lc_pca5_OF.flux.value,corrected_lc_pca5_OF.flux_err.value))
+                pca_corrected_lc = np.column_stack((corrected_lc_pca_OF.time.value,corrected_lc_pca_OF.flux.value,corrected_lc_pca_OF.flux_err.value))
 
                 unstitched_lc_regression.append(regression_corrected_lc)
                 unstitched_lc_pca.append(pca_corrected_lc)
