@@ -373,15 +373,15 @@ else:
                         plt.close(fig_cm)
 
                         if masked_cadence_limits[0] >= 0:
-                            first_timestamp = tpf.time[masked_cadence_limits[0]]
+                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
                         else:
                             first_timestamp = 0
                         if masked_cadence_limits[1] < len(tpf.time) -1:
-                            last_timestamp = tpf.time[masked_cadence_limits[1]]
+                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
                         else:
                             last_timestamp = tpf.time[-1]
 
-                        cadence_mask = ~((tpf.time >= first_timestamp) & (tpf.time <= last_timestamp))
+                        cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
 
                         tpf = tpf[cadence_mask]
 
