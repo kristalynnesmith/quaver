@@ -106,19 +106,12 @@ try :
 
 except NameResolveError:
     print("\n"+"Could not find target by name provided. Try Sky Coordinates.\n")
-    # print("Input as Galactic Coordinates: l, b  (in deg)")
     print("Input as ICRS: RA, Dec  (in deg)")
-    print("Use full precision from NED for best results.\n")
 
-    # long = float(input('Longitude: '))
-    # lat = float(input('Latitude: '))
     ra = float(input('RA: '))
     dec = float(input('Dec: '))
 
-    # gal_coordinates = SkyCoord(long, lat ,frame='galactic',unit='deg')
-    # source_coordinates = gal_coordinates.transform_to('icrs')
     source_coordinates = SkyCoord(ra,dec,frame='icrs',unit='deg')
-    # source_coordinates = SkyCoord(ra,dec,frame='icrs',unit=(u.hourangle, u.deg))
 
     target = input('Target Common Name: ')
     target_coordinates = str(ra)+" "+str(dec)
