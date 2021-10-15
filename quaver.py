@@ -90,11 +90,10 @@ def onclick_cm(event):
 
 #Set the dimension of the downloaded TPF (currently only works for squares):
 
-tpf_width_height = 15
+tpf_width_height = 25
 
 #Define target and obtain DSS image from coordinates.
 
-#target = '2MASX J11580219+5920538'
 try :
     target = input('Target Common Name: ')
     target_coordinates = target
@@ -372,67 +371,69 @@ else:
                         plt.show()
                         plt.close(fig_cm)
 
-                        if masked_cadence_limits[0] >= 0:
-                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
-                        else:
-                            first_timestamp = 0
-                        if masked_cadence_limits[1] < len(tpf.time) -1:
-                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
-                        else:
-                            last_timestamp = tpf.time[-1]
+                        if len(masked_cadence_limits) != 0:
 
-                        cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
+                            if masked_cadence_limits[0] >= 0:
+                                first_timestamp = tpf.time[masked_cadence_limits[0]].value
+                            else:
+                                first_timestamp = 0
+                            if masked_cadence_limits[1] < len(tpf.time) -1:
+                                last_timestamp = tpf.time[masked_cadence_limits[1]].value
+                            else:
+                                last_timestamp = tpf.time[-1].value
 
-                        tpf = tpf[cadence_mask]
+                            cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
 
-                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
-                        additive_bkg_and_constant = additive_bkg.append_constant()
+                            tpf = tpf[cadence_mask]
 
-                        print(np.max(np.abs(additive_bkg.values)))
+                            additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
+                            additive_bkg_and_constant = additive_bkg.append_constant()
 
-
-                        for i in range(0,max_masked_regions):
-
-                            if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
-
-                                number_masked_regions += 1
-
-                                print('Systematics remain; define the next masked region.')
-                                print(np.max(np.abs(additive_bkg.values)))
-                                fig_cm = plt.figure()
-                                ax_cm = fig_cm.add_subplot()
-                                ax_cm.plot(additive_bkg.values)
-
-                                plt.title('Select first and last cadence to define mask region:')
-                                masked_cadence_limits = []
-                                cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
-
-                                plt.show()
-                                plt.close(fig_cm)
-
-                                if len(masked_cadence_limits) != 0:
+                            print(np.max(np.abs(additive_bkg.values)))
 
 
-                                    if masked_cadence_limits[0] >= 0:
-                                        first_timestamp = tpf.time[masked_cadence_limits[0]].value
+                            for i in range(0,max_masked_regions):
+
+                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
+
+                                    number_masked_regions += 1
+
+                                    print('Systematics remain; define the next masked region.')
+                                    print(np.max(np.abs(additive_bkg.values)))
+                                    fig_cm = plt.figure()
+                                    ax_cm = fig_cm.add_subplot()
+                                    ax_cm.plot(additive_bkg.values)
+
+                                    plt.title('Select first and last cadence to define mask region:')
+                                    masked_cadence_limits = []
+                                    cid_cm = fig_cm.canvas.mpl_connect('button_press_event',onclick_cm)
+
+                                    plt.show()
+                                    plt.close(fig_cm)
+
+                                    if len(masked_cadence_limits) != 0:
+
+
+                                        if masked_cadence_limits[0] >= 0:
+                                            first_timestamp = tpf.time[masked_cadence_limits[0]].value
+                                        else:
+                                            first_timestamp = 0
+                                        if masked_cadence_limits[1] < len(tpf.time) -1:
+                                            last_timestamp = tpf.time[masked_cadence_limits[1]].value
+                                        else:
+                                            last_timestamp = tpf.time[-1].value
+
+
+                                        cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
+
+                                        tpf = tpf[cadence_mask]
+
+                                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
+                                        additive_bkg_and_constant = additive_bkg.append_constant()
+
                                     else:
-                                        first_timestamp = 0
-                                    if masked_cadence_limits[1] < len(tpf.time) -1:
-                                        last_timestamp = tpf.time[masked_cadence_limits[1]].value
-                                    else:
-                                        last_timestamp = tpf.time[-1].value
 
-
-                                    cadence_mask = ~((tpf.time.value >= first_timestamp) & (tpf.time.value <= last_timestamp))
-
-                                    tpf = tpf[cadence_mask]
-
-                                    additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
-                                    additive_bkg_and_constant = additive_bkg.append_constant()
-
-                                else:
-
-                                    number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
+                                        number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
 
 
                 # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
