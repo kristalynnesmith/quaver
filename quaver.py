@@ -36,8 +36,17 @@ from matplotlib import gridspec
 from matplotlib import patches
 import sys
 
-############################################
-#User-settings: Number of PCA Components in the Hybrid method and simple PCA correction.
+##################  TUNABLE PARAMETERS  ##########################
+#Size of the TPF postage stamp to download and use for exraction and detrending.
+tpf_width_height = 25
+
+#Maximum number of cadence-mask regions allowed:
+max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
+
+#Acceptable threshold for systematics in additive components:
+sys_threshold = 0.2
+
+#Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
 multiplicative_pca_num = 3
 pca_only_num = 3
@@ -87,11 +96,6 @@ def onclick_cm(event):
 
 #############################################
 #############################################
-
-#Set the dimension of the downloaded TPF (currently only works for squares):
-
-tpf_width_height = 25
-
 #Define target and obtain DSS image from coordinates.
 
 try :
@@ -343,9 +347,7 @@ else:
 
                 #Add a module to catch possible major systematics that need to be masked out before continuuing:
 
-                max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
-
-                if np.max(np.abs(additive_bkg.values)) > 0.15:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
+                if np.max(np.abs(additive_bkg.values)) > sys_threshold:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
                     redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
 
@@ -387,7 +389,7 @@ else:
 
                             for i in range(0,max_masked_regions):
 
-                                if np.max(np.abs(additive_bkg.values)) > 0.2  and number_masked_regions <= max_masked_regions:
+                                if np.max(np.abs(additive_bkg.values)) > sys_threshold  and number_masked_regions <= max_masked_regions:
 
                                     number_masked_regions += 1
 
