@@ -40,16 +40,17 @@ import sys
 #Size of the TPF postage stamp to download and use for exraction and detrending.
 tpf_width_height = 25
 
-#Maximum number of cadence-mask regions allowed:
-max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
-
-#Acceptable threshold for systematics in additive components:
-sys_threshold = 0.2
-
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
 multiplicative_pca_num = 3
 pca_only_num = 3
+
+#Acceptable threshold for systematics in additive components:
+sys_threshold = 0.2
+
+#Maximum number of cadence-mask regions allowed:
+max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
+
 
 ############################################
 #Define function to record the positions of clicks in the pixel array image for the extraction mask.
@@ -117,7 +118,7 @@ except NameResolveError:
 
     source_coordinates = SkyCoord(ra,dec,frame='icrs',unit='deg')
 
-    target = input('Target Common Name: ')
+    target = input('Desired object name for output files: ')
     target_coordinates = str(ra)+" "+str(dec)
 
     print(source_coordinates)
