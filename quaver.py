@@ -51,6 +51,10 @@ sys_threshold = 0.2
 #Maximum number of cadence-mask regions allowed:
 max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
 
+#Which cadence of the TESSCut file is used for the aperture selection panel
+#(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
+plot_index = 200
+
 
 ############################################
 #Define function to record the positions of clicks in the pixel array image for the extraction mask.
@@ -246,9 +250,9 @@ else:
                 #Get WCS information and flux stats of the TPF image.
                 tpf_wcs = WCS(tpf.get_header(ext=2))
 
-                pixmin = np.min(tpf.flux[200]).value
-                pixmax = np.max(tpf.flux[200]).value
-                pixmean = np.mean(tpf.flux[200]).value
+                pixmin = np.min(tpf.flux[plot_index]).value
+                pixmax = np.max(tpf.flux[plot_index]).value
+                pixmean = np.mean(tpf.flux[plot_index]).value
 
                 temp_min = float(pixmin)
                 # print(temp_min)
@@ -267,7 +271,7 @@ else:
                 fig = plt.figure(figsize=(8,8))
                 ax = fig.add_subplot(111,projection=tpf_wcs)
                 # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
-                ax.imshow(tpf.flux[200],vmin=temp_min,vmax=temp_max)
+                ax.imshow(tpf.flux[plot_index],vmin=temp_min,vmax=temp_max)
                 ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=[0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax],colors='white',alpha=0.9)
                 ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
 
