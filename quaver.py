@@ -197,7 +197,7 @@ while check_cycle == False:
             list_observed_sectors_in_cycle.append(sector_number)
             list_sectordata_index_in_cycle.append(i)
 
-    check_cycle = any(i>first_sector and i<last_sector for i in list_observed_sectors)
+    check_cycle = any(i>=first_sector and i<=last_sector for i in list_observed_sectors)
     if check_cycle == False:
         print('Selected cycle does not correspond to any observed sectors. Try again.')
 
