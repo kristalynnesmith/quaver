@@ -115,10 +115,13 @@ try :
 
 except NameResolveError:
     print("\n"+"Could not find target by name provided. Try Sky Coordinates.\n")
-    print("Input as ICRS: RA, Dec  (in deg)")
+    print("Input as ICRS: RA, Dec  (in Decimal Degrees)")
 
-    ra = float(input('RA: '))
-    dec = float(input('Dec: '))
+    input_coord_string = input('RA, Dec: ')
+    input_coord_split = re.split("\s|[,]|[,\s]",input_coord_string)
+
+    ra = float(input_coord_split[0])
+    dec = float(input_coord_split[1])
 
     source_coordinates = SkyCoord(ra,dec,frame='icrs',unit='deg')
 
