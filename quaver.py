@@ -8,6 +8,7 @@ from astropy.coordinates.name_resolve import NameResolveError
 
 import lightkurve as lk
 import numpy as np
+import re
 
 #################
 #################
