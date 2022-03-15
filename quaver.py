@@ -336,7 +336,7 @@ else:
 
                     if np.sum(tpf.flux[i] == 0) or np.isnan(np.sum(tpf.flux[i])) == True:
 
-                        nanflag = True
+                        nani = True
 
                     else:
 
@@ -555,6 +555,9 @@ else:
                 unstitched_lc_regression.append(regression_corrected_lc)
                 unstitched_lc_pca.append(pca_corrected_lc)
 
+                np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_hybrid_regressed_lc.dat',regression_corrected_lc)
+                np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_pca_regressed_lc.dat',pca_corrected_lc)
+
                 print("Sector, CCD, camera: ")
                 print(sector_number,ccd,cam)
 
@@ -694,8 +697,8 @@ for i in range(0,1-len(full_lc_time_pca)):
 regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
 pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_hybrid_regressed_lc.dat',regression_lc)
-np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_pca5_lc.dat',pca5_lc)
+np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_hybrid_regressed_lc.dat',regression_lc)
+np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_pca5_lc.dat',pca5_lc)
 
 
 
@@ -712,7 +715,7 @@ for i in range(0,len(unstitched_lc_regression)):
 
     plt.axvline(x=last_time,color='k',linestyle='--')
 
-plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_full_corr_lcs.pdf',format='pdf')
+plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_corr_lcs.pdf',format='pdf')
 
 plt.show()
 print ("Done!")
