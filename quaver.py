@@ -186,7 +186,7 @@ while check_cycle == False:
         last_sector = last_sectors[2]
     elif cycle==4:
         first_sector = first_sectors[3]
-        last_sector = last_sectors[2]
+        last_sector = last_sectors[3]
     else:
         print('Invalid Cycle Number')
 
