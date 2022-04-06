@@ -46,6 +46,10 @@ additive_pca_num = 3
 multiplicative_pca_num = 3
 pca_only_num = 3
 
+#Lowest DSS contour level, as fraction of peak brightness
+#(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
+lowest_dss_contour = 0.4
+
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
 
@@ -272,11 +276,16 @@ else:
                 aper_width = tpf[0].shape[1]
                 #Plot the TPF image and the DSS contours together, to help with aperture selection, along with the starter aperture.
 
+                if lowest_dss_contour == 0.4:
+                    dss_levels = [0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
+                else:
+                    dss_levels = [lowest_dss_contour*dss_pixmax,0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
+
                 fig = plt.figure(figsize=(8,8))
                 ax = fig.add_subplot(111,projection=tpf_wcs)
                 # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
                 ax.imshow(tpf.flux[plot_index],vmin=temp_min,vmax=temp_max)
-                ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=[0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax],colors='white',alpha=0.9)
+                ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=dss_levels,colors='white',alpha=0.9)
                 ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
 
                 ax.set_xlim(-0.5,aper_width-0.5)  #This section is needed to fix the stupid plotting issue in Python 3.
