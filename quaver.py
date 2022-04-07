@@ -345,7 +345,7 @@ else:
 
                     if np.sum(tpf.flux[i] == 0) or np.isnan(np.sum(tpf.flux[i])) == True:
 
-                        nani = True
+                        nanflag = True
 
                     else:
 
