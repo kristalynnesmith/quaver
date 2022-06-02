@@ -139,7 +139,7 @@ except NameResolveError:
 #############################################
 
 
-dss_image = SkyView.get_images(position=source_coordinates,survey='DSS',pixels=str(400))
+dss_image = SkyView.get_images(position=source_coordinates,survey='DSS2 Red',pixels=str(400))
 wcs_dss = WCS(dss_image[0][0].header)
 dss_pixmin = np.min(dss_image[0][0].data)
 dss_pixmax = np.max(dss_image[0][0].data)
