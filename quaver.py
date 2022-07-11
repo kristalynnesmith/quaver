@@ -48,13 +48,13 @@ pca_only_num = 3
 
 #Lowest DSS contour level, as fraction of peak brightness
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
-lowest_dss_contour = 0.4
+lowest_dss_contour = 0.3
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
 
 #Maximum number of cadence-mask regions allowed:
-max_masked_regions = 3 #set maximum number of regions of the light curve that can be masked out.
+max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
 
 #Which cadence of the TESSCut file is used for the aperture selection panel
 #(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
@@ -648,7 +648,7 @@ else:
             first_flux_pca = f_pca[0]
 
             last_flux_reg = full_lc_flux_reg[-1]
-            last_flux_pca = full_lc_flux_reg[-1]
+            last_flux_pca = full_lc_flux_pca[-1]
 
             scale_factor_reg = first_flux_reg - last_flux_reg
             scale_factor_pca = first_flux_pca - last_flux_pca
