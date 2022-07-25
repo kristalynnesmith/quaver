@@ -48,7 +48,7 @@ pca_only_num = 3
 
 #Lowest DSS contour level, as fraction of peak brightness
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
-lowest_dss_contour = 0.3
+lowest_dss_contour = 0.4
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
@@ -644,11 +644,11 @@ else:
 
         else:
 
-            first_flux_reg = f_reg[0]
-            first_flux_pca = f_pca[0]
+            first_flux_reg = np.mean(f_reg[:10])
+            first_flux_pca = np.mean(f_pca[:10])
 
-            last_flux_reg = full_lc_flux_reg[-1]
-            last_flux_pca = full_lc_flux_pca[-1]
+            last_flux_reg = np.mean(full_lc_flux_reg[-10:])
+            last_flux_pca = np.mean(full_lc_flux_pca[-10:])
 
             scale_factor_reg = first_flux_reg - last_flux_reg
             scale_factor_pca = first_flux_pca - last_flux_pca
