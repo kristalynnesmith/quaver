@@ -58,7 +58,7 @@ max_masked_regions = 5 #set maximum number of regions of the light curve that ca
 
 #Which cadence of the TESSCut file is used for the aperture selection panel
 #(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
-plot_index = 200
+plot_index = 500
 
 
 ############################################
