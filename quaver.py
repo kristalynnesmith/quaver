@@ -371,7 +371,7 @@ else:
 
                     if np.max(np.abs(additive_bkg.values)) > sys_threshold:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
-                        redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
+                        redo_with_mask = input('Additive trends in the background indicate major systematics; add a cadence mask (Y/N) ?')
 
                         if redo_with_mask == 'Y' or redo_with_mask=='y' or redo_with_mask=='YES' or redo_with_mask=='yes':
 
@@ -452,8 +452,7 @@ else:
 
                                             number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
 
-
-                    # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
+                    # Now we correct all the bright pixels EXCLUDING THE SOURCE by the background, so we can find the remaining multiplicative trend
 
                     r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
 
@@ -463,18 +462,27 @@ else:
                         r.correct(additive_bkg_and_constant)
                         corrected_pixels.append(r.corrected_lc.flux)
 
-                    #Getting the multiplicative effects now from the bright pixels that have been corrected for additive effects.
+
+                    #Getting the multiplicative effects now from the bright pixels.
 
                     multiplicative_hybrid_pcas = multiplicative_pca_num
                     multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(multiplicative_hybrid_pcas)
 
+                    #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
+                    #This is not currently used, because it tends to over-fit the low-frequency behavior against the scattered light.
+                    #However, it can be used to study the high-frequency behavior in detail if needed.
                     #Create a higher order version of the additive effects:
+                    '''
                     additive_bkg_squared = deepcopy(additive_bkg)
                     additive_bkg_squared.df = additive_bkg_squared.df**2
 
-                    #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
 
                     dm = lk.DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
+                    '''
+
+                    #Create a design matrix using the multiplicative components determined from the additively-corrected bright sources:
+                    dm_mult = multiplicative_bkg
+                    dm_mult = dm_mult.append_constant()
 
                     #Now get the raw light curve.
                     lc = tpf.to_lightcurve(aperture_mask=aper_mod)
@@ -487,9 +495,27 @@ else:
                     lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
 
                     #And correct it:
-                    clc = lk.RegressionCorrector(lc).correct(dm)
 
-                    #Now we begin the simpler method of using PCA components, with no hybrid matrix:
+                    corrector_1 = lk.RegressionCorrector(lc)
+                    clc = corrector_1.correct(dm_mult)
+
+                    #Added 9/26/22: Since we did not correct for the additive background using the regressors,
+                    #we now do simple background subtraction of the faint mask light curve.
+
+                    lc_bg = tpf.to_lightcurve(method='sap',corrector=None,aperture_mask = allfaint_mask)
+
+                    num_pixels_faint = np.count_nonzero(allfaint_mask)
+                    num_pixels_mask = np.count_nonzero(aper_mod)
+
+                    lc_bg_time = lc_bg.time.value
+                    lc_bg_flux = lc_bg.flux.value
+                    lc_bg_fluxerr = lc_bg.flux_err.value
+
+                    lc_bg_flux_scaled = (lc_bg_flux / num_pixels_faint) * num_pixels_mask
+
+                    clc.flux = clc.flux.value - lc_bg_flux_scaled
+
+                    #Now we begin the simpler method of using PCA components of all non-source pixels.
 
                     raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
 
@@ -514,14 +540,12 @@ else:
                     #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
                 #    corrected_lc_pca5_OF = raw_lc_OF - model_pca5_OF
 
-                    #AND PLOT THE CORRECTED LIGHT CURVES, BOTH METHODS TOGETHER:
-                    #Want to also add the mult/add component plots and the aperture plot!
-
+                    #AND PLOT THE CORRECTED LIGHT CURVE.
 
                     fig2 = plt.figure(figsize=(12,8))
                     gs = gridspec.GridSpec(ncols=3, nrows=3,wspace=0.5,hspace=0.5,width_ratios=[1,1,2])
                     f_ax1 = fig2.add_subplot(gs[0, :])
-                    f_ax1.set_title(target+': Corrected Light Curves')
+                    f_ax1.set_title(target+': Corrected Light Curve')
                     f_ax2 = fig2.add_subplot(gs[1, :-1])
                     f_ax2.set_title('Additive Components')
                     f_ax3 = fig2.add_subplot(gs[2:,:-1])
@@ -529,8 +553,8 @@ else:
                     f_ax4 = fig2.add_subplot(gs[1:,-1])
                     #f_ax4.set_title('Aperture')
 
-                    clc.plot(ax=f_ax1,label='Hybrid Method')
-                    corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
+                    clc.plot(ax=f_ax1)
+        #            corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
 
                     f_ax2.plot(additive_bkg.values)
                     f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
@@ -538,7 +562,6 @@ else:
                     tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
                     # print("\n")
-                    print("\nMade lightcurve and aperture selection.\n")
 
                     ### Keeping track of what relative sector is being observed, keeps figures from experiencing FileExistsError
                     ## This section creates individual directories for each object in which the quaver procesed light curve data is stored
