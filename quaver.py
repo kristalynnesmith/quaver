@@ -499,6 +499,8 @@ else:
                     corrector_1 = lk.RegressionCorrector(lc)
                     clc = corrector_1.correct(dm_mult)
 
+                    median_flux_precorr = np.median(clc.flux.value) #Calculate the median flux before the background subtraction upcoming.
+
                     #Added 9/26/22: Since we did not correct for the additive background using the regressors,
                     #we now do simple background subtraction of the faint mask light curve.
 
@@ -514,6 +516,12 @@ else:
                     lc_bg_flux_scaled = (lc_bg_flux / num_pixels_faint) * num_pixels_mask
 
                     clc.flux = clc.flux.value - lc_bg_flux_scaled
+
+                    #Now, in order that the final light curve has a median flux similar to the pre-subtracted flux:
+
+                    median_flux_postsub = np.median(clc.flux.value)
+                    additive_rescale_factor = median_flux_precorr - median_flux_postsub
+                    clc.flux = clc.flux.value + additive_rescale_factor
 
                     #Now we begin the simpler method of using PCA components of all non-source pixels.
 
@@ -553,8 +561,8 @@ else:
                     f_ax4 = fig2.add_subplot(gs[1:,-1])
                     #f_ax4.set_title('Aperture')
 
-                    clc.plot(ax=f_ax1)
-        #            corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
+                    clc.plot(ax=f_ax1, label='Hybrid Method')
+                    corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA Method')
 
                     f_ax2.plot(additive_bkg.values)
                     f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
@@ -740,12 +748,12 @@ else:
     pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
     np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_hybrid_regressed_lc.dat',regression_lc)
-    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_pca5_lc.dat',pca5_lc)
+    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_pca_lc.dat',pca5_lc)
 
 
 
     #Plot the corrected light curves and save image.
-    plt.errorbar(full_lc_time_pca,full_lc_flux_pca,yerr = full_lc_err_pca,marker='o',markersize=1,color='orange',linestyle='none',label='PCA5 Method')
+    plt.errorbar(full_lc_time_pca,full_lc_flux_pca,yerr = full_lc_err_pca,marker='o',markersize=1,color='orange',linestyle='none',label='Simple PCA Method')
     plt.errorbar(full_lc_time_reg,full_lc_flux_reg,yerr = full_lc_err_reg,marker='o',markersize=1,color='b',linestyle='none',label='Hybrid Method')
 
     plt.legend()
