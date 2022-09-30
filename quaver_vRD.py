@@ -39,7 +39,7 @@ import sys
 
 ##################  TUNABLE PARAMETERS  ##########################
 #Size of the TPF postage stamp to download and use for exraction and detrending.
-tpf_width_height = 25
+tpf_width_height = 20
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -51,14 +51,14 @@ pca_only_num = 3
 lowest_dss_contour = 0.4
 
 #Acceptable threshold for systematics in additive components:
-sys_threshold = 0.2
+sys_threshold = 0.15
 
 #Maximum number of cadence-mask regions allowed:
 max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
 
 #Which cadence of the TESSCut file is used for the aperture selection panel
 #(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
-plot_index = 200
+plot_index = 500
 
 
 ############################################
@@ -371,7 +371,7 @@ else:
 
                     if np.max(np.abs(additive_bkg.values)) > sys_threshold:   #None of the normally extracted objects has additive components with absolute values over 0.2 ish.
 
-                        redo_with_mask = input('Additive components indicate major systematics; add a cadence mask (Y/N) ?')
+                        redo_with_mask = input('Additive trends in the background indicate major systematics; add a cadence mask (Y/N) ?')
 
                         if redo_with_mask == 'Y' or redo_with_mask=='y' or redo_with_mask=='YES' or redo_with_mask=='yes':
 
@@ -452,8 +452,7 @@ else:
 
                                             number_masked_regions = max_masked_regions+1    #stops the loop if the user no longer wishes to add more regions.
 
-
-                    # Now we correct all the bright pixels by the background, so we can find the remaining multiplicative trend
+                    # Now we correct all the bright pixels EXCLUDING THE SOURCE by the background, so we can find the remaining multiplicative trend
 
                     r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
 
@@ -463,18 +462,27 @@ else:
                         r.correct(additive_bkg_and_constant)
                         corrected_pixels.append(r.corrected_lc.flux)
 
-                    #Getting the multiplicative effects now from the bright pixels that have been corrected for additive effects.
+
+                    #Getting the multiplicative effects now from the bright pixels.
 
                     multiplicative_hybrid_pcas = multiplicative_pca_num
                     multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(multiplicative_hybrid_pcas)
 
+                    #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
+                    #This is not currently used, because it tends to over-fit the low-frequency behavior against the scattered light.
+                    #However, it can be used to study the high-frequency behavior in detail if needed.
                     #Create a higher order version of the additive effects:
+                    '''
                     additive_bkg_squared = deepcopy(additive_bkg)
                     additive_bkg_squared.df = additive_bkg_squared.df**2
 
-                    #Now we make a fancy hybrid design matrix that has both orders of the additive effects and the multiplicative ones.
 
                     dm = lk.DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
+                    '''
+
+                    #Create a design matrix using the multiplicative components determined from the additively-corrected bright sources:
+                    dm_mult = multiplicative_bkg
+                    dm_mult = dm_mult.append_constant()
 
                     #Now get the raw light curve.
                     lc = tpf.to_lightcurve(aperture_mask=aper_mod)
@@ -487,9 +495,27 @@ else:
                     lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
 
                     #And correct it:
-                    clc = lk.RegressionCorrector(lc).correct(dm)
 
-                    #Now we begin the simpler method of using PCA components, with no hybrid matrix:
+                    corrector_1 = lk.RegressionCorrector(lc)
+                    clc = corrector_1.correct(dm_mult)
+
+                    #Added 9/26/22: Since we did not correct for the additive background using the regressors,
+                    #we now do simple background subtraction of the faint mask light curve.
+
+                    lc_bg = tpf.to_lightcurve(method='sap',corrector=None,aperture_mask = allfaint_mask)
+
+                    num_pixels_faint = np.count_nonzero(allfaint_mask)
+                    num_pixels_mask = np.count_nonzero(aper_mod)
+
+                    lc_bg_time = lc_bg.time.value
+                    lc_bg_flux = lc_bg.flux.value
+                    lc_bg_fluxerr = lc_bg.flux_err.value
+
+                    lc_bg_flux_scaled = (lc_bg_flux / num_pixels_faint) * num_pixels_mask
+
+                    clc.flux = clc.flux.value - lc_bg_flux_scaled
+
+                    #Now we begin the simpler method of using PCA components of all non-source pixels.
 
                     raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
 
@@ -514,14 +540,12 @@ else:
                     #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
                 #    corrected_lc_pca5_OF = raw_lc_OF - model_pca5_OF
 
-                    #AND PLOT THE CORRECTED LIGHT CURVES, BOTH METHODS TOGETHER:
-                    #Want to also add the mult/add component plots and the aperture plot!
-
+                    #AND PLOT THE CORRECTED LIGHT CURVE.
 
                     fig2 = plt.figure(figsize=(12,8))
                     gs = gridspec.GridSpec(ncols=3, nrows=3,wspace=0.5,hspace=0.5,width_ratios=[1,1,2])
                     f_ax1 = fig2.add_subplot(gs[0, :])
-                    f_ax1.set_title(target+': Corrected Light Curves')
+                    f_ax1.set_title(target+': Corrected Light Curve')
                     f_ax2 = fig2.add_subplot(gs[1, :-1])
                     f_ax2.set_title('Additive Components')
                     f_ax3 = fig2.add_subplot(gs[2:,:-1])
@@ -529,8 +553,8 @@ else:
                     f_ax4 = fig2.add_subplot(gs[1:,-1])
                     #f_ax4.set_title('Aperture')
 
-                    clc.plot(ax=f_ax1,label='Hybrid Method')
-                    corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
+                    clc.plot(ax=f_ax1)
+                    #corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA')
 
                     f_ax2.plot(additive_bkg.values)
                     f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
@@ -538,7 +562,6 @@ else:
                     tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
                     # print("\n")
-                    print("\nMade lightcurve and aperture selection.\n")
 
                     ### Keeping track of what relative sector is being observed, keeps figures from experiencing FileExistsError
                     ## This section creates individual directories for each object in which the quaver procesed light curve data is stored
@@ -559,6 +582,7 @@ else:
                         plt.show()
     ##################################################################################
     ###############################################################################
+
 
                     raw_lc = np.column_stack((lc.time.value,lc.flux.value,lc.flux_err.value))
                     regression_corrected_lc = np.column_stack((clc.time.value,clc.flux.value,clc.flux_err.value))
@@ -581,7 +605,7 @@ else:
     #############################################
     #############################################
 
-
+        # If target coordinates are too close to edge on approach, this will skip that sector and read the next.
         # If target coordinates are too close to edge on exit, this will skip that sector and break on the next loop.
         ## WARNING: May also occur if connection to HEASARC could not be made. Check website and/or internet connection.
 
@@ -603,168 +627,177 @@ else:
 
 print("No more observed sectors in this cycle.")
 
-print("Stitching light curves together.\n")
+if len(unstitched_lc_regression)==0 and len(unstitched_lc_pca)==0:
+    print("No light curve data extracted, exiting program.")
 
-#Loop for stitching the light curves together
+    sys.exit()
 
+else:
+    print("Stitching light curves together.\n")
 
-for j in range(0,len(unstitched_lc_regression)):
-    if j==0:
-        print("First observed sector")
-    else:
-        sector = str(j+1)
-        print('Stitching '+sector+' sectors')
+    #Loop for stitching the light curves together
 
-    lc_raw = unstitched_lc_raw[j]
-    lc_reg = unstitched_lc_regression[j]
-    lc_pca = unstitched_lc_pca[j]
 
-    t_raw = lc_raw[:,0]
-    f_raw = lc_raw[:,1]
-    err_raw = lc_raw[:,2]
+    for j in range(0,len(unstitched_lc_regression)):
+        if j==0:
+            print("First observed sector")
+        else:
+            sector = str(j+1)
+            print('Stitching '+sector+' sectors')
 
-    t_reg = lc_reg[:,0]
-    f_reg = lc_reg[:,1]
-    err_reg = lc_reg[:,2]
+        lc_raw = unstitched_lc_raw[j]
+        lc_reg = unstitched_lc_regression[j]
+        lc_pca = unstitched_lc_pca[j]
+        
+        t_raw = lc_raw[:,0]
+        f_raw = lc_raw[:,1]
+        err_raw = lc_raw[:,2]
 
-    t_pca = lc_pca[:,0]
-    f_pca = lc_pca[:,1]
-    err_pca = lc_pca[:,2]
+        t_reg = lc_reg[:,0]
+        f_reg = lc_reg[:,1]
+        err_reg = lc_reg[:,2]
 
-    if j == 0:
+        t_pca = lc_pca[:,0]
+        f_pca = lc_pca[:,1]
+        err_pca = lc_pca[:,2]
 
-        full_lc_flux_raw = f_raw
-        full_lc_flux_reg = f_reg
-        full_lc_flux_pca = f_pca
+        if j == 0:
 
-        full_lc_time_raw = t_raw
-        full_lc_time_reg = t_reg
-        full_lc_time_pca = t_pca
+            full_lc_flux_raw = f_raw
+            full_lc_flux_reg = f_reg
+            full_lc_flux_pca = f_pca
 
-        full_lc_err_raw = err_raw
-        full_lc_err_reg = err_reg
-        full_lc_err_pca = err_pca
+            full_lc_time_raw = t_raw
+            full_lc_time_reg = t_reg
+            full_lc_time_pca = t_pca
 
-    else:
+            full_lc_err_raw = err_raw
+            full_lc_err_reg = err_reg
+            full_lc_err_pca = err_pca
 
-        first_flux_raw = f_raw[0]
-        first_flux_reg = f_reg[0]
-        first_flux_pca = f_pca[0]
+        else:
 
-        last_flux_raw = full_lc_flux_raw[-1]
-        last_flux_reg = full_lc_flux_reg[-1]
-        last_flux_pca = full_lc_flux_reg[-1]
+            first_flux_raw = f_raw[0]
+            first_flux_reg = np.mean(f_reg[:10])
+            first_flux_pca = np.mean(f_pca[:10])
 
-        scale_factor_raw = first_flux_reg - last_flux_raw
-        scale_factor_reg = first_flux_reg - last_flux_reg
-        scale_factor_pca = first_flux_pca - last_flux_pca
+            last_flux_raw = full_lc_flux_raw[-1]
+            last_flux_reg = np.mean(full_lc_flux_reg[-10:])
+            last_flux_pca = np.mean(full_lc_flux_pca[-10:])
 
-        if scale_factor_raw > 0:
+            scale_factor_raw = first_flux_reg - last_flux_raw
+            scale_factor_reg = first_flux_reg - last_flux_reg
+            scale_factor_pca = first_flux_pca - last_flux_pca
 
-            scaled_flux_raw = f_raw - abs(scale_factor_raw)
+            if scale_factor_raw > 0:
 
-        if scale_factor_raw < 0:
+                scaled_flux_raw = f_raw - abs(scale_factor_raw)
 
-            scaled_flux_raw = f_raw + abs(scale_factor_raw)
+            if scale_factor_raw < 0:
 
-        if scale_factor_reg > 0:
+                scaled_flux_raw = f_raw + abs(scale_factor_raw)
+            
+            if scale_factor_reg > 0:
 
-            scaled_flux_reg = f_reg - abs(scale_factor_reg)
+                scaled_flux_reg = f_reg - abs(scale_factor_reg)
 
-        if scale_factor_reg < 0:
+            if scale_factor_reg < 0:
 
-            scaled_flux_reg = f_reg + abs(scale_factor_reg)
+                scaled_flux_reg = f_reg + abs(scale_factor_reg)
 
-        if scale_factor_pca > 0:
+            if scale_factor_pca > 0:
 
-            scaled_flux_pca = f_pca - abs(scale_factor_pca)
+                scaled_flux_pca = f_pca - abs(scale_factor_pca)
 
-        if scale_factor_pca < 0:
+            if scale_factor_pca < 0:
 
-            scaled_flux_pca = f_pca + abs(scale_factor_pca)
+                scaled_flux_pca = f_pca + abs(scale_factor_pca)
 
 
-        full_lc_flux_raw = np.append(full_lc_flux_raw,scaled_flux_raw)
-        full_lc_flux_reg = np.append(full_lc_flux_reg,scaled_flux_reg)
-        full_lc_flux_pca = np.append(full_lc_flux_pca,scaled_flux_pca)
+            full_lc_flux_raw = np.append(full_lc_flux_raw,scaled_flux_raw)
+            full_lc_flux_reg = np.append(full_lc_flux_reg,scaled_flux_reg)
+            full_lc_flux_pca = np.append(full_lc_flux_pca,scaled_flux_pca)
 
-        full_lc_time_raw = np.append(full_lc_time_raw,t_raw)
-        full_lc_time_reg = np.append(full_lc_time_reg,t_reg)
-        full_lc_time_pca = np.append(full_lc_time_pca,t_pca)
+            full_lc_time_raw = np.append(full_lc_time_raw,t_raw)
+            full_lc_time_reg = np.append(full_lc_time_reg,t_reg)
+            full_lc_time_pca = np.append(full_lc_time_pca,t_pca)
 
-        full_lc_err_raw = np.append(full_lc_err_raw,err_raw)
-        full_lc_err_reg = np.append(full_lc_err_reg,err_reg)
-        full_lc_err_pca = np.append(full_lc_err_pca,err_pca)
+            full_lc_err_raw = np.append(full_lc_err_raw,err_raw)
+            full_lc_err_reg = np.append(full_lc_err_reg,err_reg)
+            full_lc_err_pca = np.append(full_lc_err_pca,err_pca)
 
 
 
-#Remove single-cadence jumps greater than 1% of the flux on either side from both finished light curves
+    #Remove single-cadence jumps greater than 1% of the flux on either side from both finished light curves
 
-for i in range(0,1-len(full_lc_time_raw)):
+    for i in range(0,1-len(full_lc_time_raw)):
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] > (0.01 * full_lc_flux_reg[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] > (0.01 * full_lc_flux_reg[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
 
-        full_lc_flux_raw = np.delete(full_lc_flux_raw,i)
-        full_lc_time_raw = np.delete(full_lc_time_raw,i)
+            full_lc_flux_raw = np.delete(full_lc_flux_raw,i)
+            full_lc_time_raw = np.delete(full_lc_time_raw,i)
+    
+    for i in range(0,1-len(full_lc_time_reg)):
 
-for i in range(0,1-len(full_lc_time_reg)):
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] > (0.01 * full_lc_flux_reg[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] > (0.01 * full_lc_flux_reg[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
+            full_lc_flux_reg = np.delete(full_lc_flux_reg,i)
+            full_lc_time_reg = np.delete(full_lc_time_reg,i)
 
-        full_lc_flux_reg = np.delete(full_lc_flux_reg,i)
-        full_lc_time_reg = np.delete(full_lc_time_reg,i)
+    for i in range(0,1-len(full_lc_time_pca)):
 
-for i in range(0,1-len(full_lc_time_pca)):
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i-1]+full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (0.01 * full_lc_flux_pca[i+1]+full_lc_flux_pca[i+1]):
+            full_lc_flux_pca = np.delete(full_lc_flux_pca,i)
+            full_lc_time_pca = np.delete(full_lc_time_pca,i)
 
-        full_lc_flux_pca = np.delete(full_lc_flux_pca,i)
-        full_lc_time_pca = np.delete(full_lc_time_pca,i)
+    for i in range(0,1-len(full_lc_time_raw)):
 
-for i in range(0,1-len(full_lc_time_raw)):
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_reg[i-1]) and full_lc_flux_pca[i] < (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_reg[i-1]) and full_lc_flux_pca[i] < (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
+            full_lc_flux_raw = np.delete(full_lc_flux_raw,i)
+            full_lc_time_raw = np.delete(full_lc_time_raw,i)
+    
+    for i in range(0,1-len(full_lc_time_reg)):
 
-        full_lc_flux_raw = np.delete(full_lc_flux_raw,i)
-        full_lc_time_raw = np.delete(full_lc_time_raw,i)
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_reg[i-1]) and full_lc_flux_pca[i] < (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
 
-for i in range(0,1-len(full_lc_time_reg)):
+            full_lc_flux_reg = np.delete(full_lc_flux_reg,i)
+            full_lc_time_reg = np.delete(full_lc_time_reg,i)
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_reg[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_reg[i-1]) and full_lc_flux_pca[i] < (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
+    for i in range(0,1-len(full_lc_time_pca)):
 
-        full_lc_flux_reg = np.delete(full_lc_flux_reg,i)
-        full_lc_time_reg = np.delete(full_lc_time_reg,i)
+        if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_pca[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
 
-for i in range(0,1-len(full_lc_time_pca)):
+            full_lc_flux_pca = np.delete(full_lc_flux_pca,i)
+            full_lc_time_pca = np.delete(full_lc_time_pca,i)
 
-    if i !=0 and i != len(full_lc_flux_reg)-1 and full_lc_flux_pca[i] < (full_lc_flux_pca[i-1]-0.01 * full_lc_flux_pca[i-1]) and full_lc_flux_pca[i] > (full_lc_flux_pca[i+1]-0.01 * full_lc_flux_pca[i+1]):
+    #Compile and save the corrected light curves.
 
-        full_lc_flux_pca = np.delete(full_lc_flux_pca,i)
-        full_lc_time_pca = np.delete(full_lc_time_pca,i)
+    raw_lc = np.column_stack((full_lc_time_raw,full_lc_flux_raw,full_lc_err_raw))
+    regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
+    pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-#Compile and save the corrected light curves.
+    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
+    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_hybrid_regressed_lc.dat',regression_lc)
+    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_pca5_lc.dat',pca5_lc)
 
-raw_lc = np.column_stack((full_lc_time_raw,full_lc_flux_raw,full_lc_err_raw))
-regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
-pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-np.savetxt('../regression_program_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
-np.savetxt('../regression_program_output/'+target_safename+'/'+target_safename+'_full_hybrid_regressed_lc.dat',regression_lc)
-np.savetxt('../regression_program_output/'+target_safename+'/'+target_safename+'_full_pca5_lc.dat',pca5_lc)
 
+    #Plot the corrected light curves and save image.
+    plt.errorbar(full_lc_time_pca,full_lc_flux_pca,yerr = full_lc_err_pca,marker='o',markersize=1,color='orange',linestyle='none',label='PCA5 Method')
+    plt.errorbar(full_lc_time_reg,full_lc_flux_reg,yerr = full_lc_err_reg,marker='o',markersize=1,color='b',linestyle='none',label='Hybrid Method')
 
+    plt.legend()
 
-#Plot the corrected light curves and save image.
-plt.errorbar(full_lc_time_pca,full_lc_flux_pca,yerr = full_lc_err_pca,marker='o',markersize=1,color='orange',linestyle='none',label='PCA5 Method')
-plt.errorbar(full_lc_time_reg,full_lc_flux_reg,yerr = full_lc_err_reg,marker='o',markersize=1,color='b',linestyle='none',label='Hybrid Method')
 
-plt.legend()
+    for i in range(0,len(unstitched_lc_regression)):
 
+        last_time = unstitched_lc_regression[i][:,0][-1]
 
-for i in range(0,len(unstitched_lc_regression)):
+        plt.axvline(x=last_time,color='k',linestyle='--')
 
-    last_time = unstitched_lc_regression[i][:,0][-1]
+    plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_corr_lcs.pdf',format='pdf')
 
-    plt.axvline(x=last_time,color='k',linestyle='--')
-
-plt.savefig('../regression_program_output/'+target_safename+'/'+target_safename+'_full_corr_lcs.pdf',format='pdf')
+    plt.show()
+    print ("Done!")
