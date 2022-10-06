@@ -342,7 +342,7 @@ else:
                     thumb -= np.nanpercentile(thumb, 20)
                     allbright_mask = thumb > np.percentile(thumb, 40)
                     '''
-                    allbright_mask = tpf.create_threshold_mask(threshold=1.0,reference_pixel=None)
+                    allbright_mask = tpf.create_threshold_mask(threshold=1.5,reference_pixel=None)
                     allfaint_mask = ~allbright_mask
 
                     allbright_mask &= ~aper_buffer
