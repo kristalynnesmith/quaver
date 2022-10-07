@@ -636,6 +636,8 @@ else:
                     print("Sector, CCD, camera: ")
                     print(sector_number,ccd,cam)
 
+                    print("Percent variability before background subtraction: "+str(round(percent_variability,2))+"%")
+
     #############################################
     #############################################
                     print("\nMoving to next sector.\n")
