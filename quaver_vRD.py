@@ -38,6 +38,13 @@ from matplotlib import patches
 import sys
 
 ##################  TUNABLE PARAMETERS  ##########################
+
+#Which method would you like to use?
+#  1 = full hybrid reduction (see User's Guide)
+#  2 = simple reduction using Principle Component Analysis
+
+systematics_correction_method = 1
+
 #Size of the TPF postage stamp to download and use for exraction and detrending.
 tpf_width_height = 20
 
@@ -488,22 +495,9 @@ else:
                     lc = tpf.to_lightcurve(aperture_mask=aper_mod)
                 #  lc = lc[lc.flux_err > 0]        #This was suggested by an error message to prevent the "flux uncertainties" problem.
 
-                    #Replace any errors that are zero or negative with the mean error:
+                    median_flux_precorr = np.median(lc.flux.value) #Calculate the median flux before the background subtraction upcoming.
 
-                    mean_error = np.mean(lc.flux_err[np.isfinite(lc.flux_err)])
-                    lc.flux_err = np.where(lc.flux_err == 0,mean_error,lc.flux_err)
-                    lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
-
-                    #And correct it:
-
-                    corrector_1 = lk.RegressionCorrector(lc)
-                    clc = corrector_1.correct(dm_mult)
-
-                    median_flux_precorr = np.median(clc.flux.value) #Calculate the median flux before the background subtraction upcoming.
-
-                    #Added 9/26/22: Since we did not correct for the additive background using the regressors,
-                    #we now do simple background subtraction of the faint mask light curve.
-
+                    #Perform simple background subtraction to handle additive effects:
                     lc_bg = tpf.to_lightcurve(method='sap',corrector=None,aperture_mask = allfaint_mask)
 
                     num_pixels_faint = np.count_nonzero(allfaint_mask)
@@ -515,14 +509,28 @@ else:
 
                     lc_bg_flux_scaled = (lc_bg_flux / num_pixels_faint) * num_pixels_mask
 
-                    clc.flux = clc.flux.value - lc_bg_flux_scaled
+                    lc.flux = lc.flux.value - lc_bg_flux_scaled
+
+                    #Replace any errors that are zero or negative with the mean error:
+
+                    mean_error = np.mean(lc.flux_err[np.isfinite(lc.flux_err)])
+                    lc.flux_err = np.where(lc.flux_err == 0,mean_error,lc.flux_err)
+                    lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
                     
-                    #Now, in order that the final light curve has a median flux similar to the pre-subtracted flux:
+                    
+                    #And correct regressively for the multiplicative effects:
+
+                    corrector_1 = lk.RegressionCorrector(lc)
+                    clc = corrector_1.correct(dm_mult)
+
+                    #Now, in order that the final light curve has a median flux similar to the pre-subtracted flux,
+                    #while maintaining the percent-amplitude of the variability by using a multiplicative scaling.
 
                     median_flux_postsub = np.median(clc.flux.value)
-                    additive_rescale_factor = median_flux_precorr - median_flux_postsub
-                    clc.flux = clc.flux.value + additive_rescale_factor
+                    multiplicative_rescale_factor = median_flux_precorr / median_flux_postsub
+                    clc.flux = clc.flux.value * multiplicative_rescale_factor
 
+                    
                     #Now we begin the simpler method of using PCA components of all non-source pixels.
 
                     raw_lc_OF = tpf.to_lightcurve(aperture_mask=aper_mod)
@@ -555,17 +563,26 @@ else:
                     f_ax1 = fig2.add_subplot(gs[0, :])
                     f_ax1.set_title(target+': Corrected Light Curve')
                     f_ax2 = fig2.add_subplot(gs[1, :-1])
-                    f_ax2.set_title('Additive Components')
-                    f_ax3 = fig2.add_subplot(gs[2:,:-1])
-                    f_ax3.set_title('Multiplicative Components')
-                    f_ax4 = fig2.add_subplot(gs[1:,-1])
-                    #f_ax4.set_title('Aperture')
+                    if systematics_correction_method == 1:
+                        f_ax2.set_title('Additive Components')
+                        f_ax3 = fig2.add_subplot(gs[2:,:-1])
+                        f_ax3.set_title('Multiplicative Components')
+                        f_ax4 = fig2.add_subplot(gs[1:,-1])
+                    elif systematics_correction_method == 2:
+                        f_ax2.set_title('Principal Components')
+                        f_ax4 = fig2.add_subplot(gs[1:,-1])
 
-                    clc.plot(ax=f_ax1, label='Hybrid Method')
-                    corrected_lc_pca_OF.plot(ax=f_ax1,label='Simple PCA Method')
 
-                    f_ax2.plot(additive_bkg.values)
-                    f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
+                    if systematics_correction_method == 1:
+                        clc.plot(ax=f_ax1)
+                    elif systematics_correction_method == 2:
+                        corrected_lc_pca_OF.plot(ax=f_ax1)
+
+                    if systematics_correction_method == 1:
+                        f_ax2.plot(additive_bkg.values)
+                        f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
+                    elif systematics_correction_method == 2:
+                        f_ax2.plot(dm_pca_OF.values[:,0:-1])
 
                     tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
@@ -580,14 +597,23 @@ else:
                     directory = str(target).replace(" ","")
                     target_safename = target.replace(" ","")
                     try:
-                        os.makedirs('regression_program_output/'+target_safename)
+                        os.makedirs('quaver_output/'+target_safename)
                         print("Directory '% s' created\n" % directory)
-                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
-                        plt.show()
+                        if systematics_correction_method == 1:
+                            plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_hybrid_sector'+sec+'.pdf',format='pdf')
+                            plt.show()
+                        elif systematics_correction_method == 2:
+                            plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_PCA_sector'+sec+'.pdf',format='pdf')
+                            plt.show()
+                            
                     except FileExistsError:
                         print("Saving to folder '% s'\n" % directory)
-                        plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_regression_w_apsel_add_mult_comp_lcs_sector'+sec+'.pdf',format='pdf')
-                        plt.show()
+                        if systematics_correction_method == 1:
+                            plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_hybrid_sector'+sec+'.pdf',format='pdf')
+                            plt.show()
+                        elif systematics_correction_method == 2:
+                            plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_PCA_sector'+sec+'.pdf',format='pdf')
+                            plt.show()
     ##################################################################################
     ###############################################################################
 
@@ -600,9 +626,9 @@ else:
                     unstitched_lc_regression.append(regression_corrected_lc)
                     unstitched_lc_pca.append(pca_corrected_lc)
 
-                    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_raw_lc.dat',raw_lc)
-                    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_hybrid_regressed_lc.dat',regression_corrected_lc)
-                    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_pca_regressed_lc.dat',pca_corrected_lc)
+                    np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_raw_lc.dat',raw_lc)
+                    np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_hybrid_lc.dat',regression_corrected_lc)
+                    np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_sector'+sec+'_PCA_lc.dat',pca_corrected_lc)
 
                     print("Sector, CCD, camera: ")
                     print(sector_number,ccd,cam)
@@ -786,25 +812,27 @@ else:
     regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
     pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
-    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_hybrid_regressed_lc.dat',regression_lc)
-    np.savetxt('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_pca_lc.dat',pca5_lc)
-
+    np.savetxt('quaver_program_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
+    if systematics_correction_method == 1:
+        np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_hybrid_lc.dat',regression_lc)
+    elif systematics_correction_method == 2:
+        np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_PCA_lc.dat',pca5_lc)
 
     #Plot the corrected light curves and save image.
     plt.errorbar(full_lc_time_pca,full_lc_flux_pca,yerr = full_lc_err_pca,marker='o',markersize=1,color='orange',linestyle='none',label='Simple PCA Method')
     plt.errorbar(full_lc_time_reg,full_lc_flux_reg,yerr = full_lc_err_reg,marker='o',markersize=1,color='b',linestyle='none',label='Hybrid Method')
 
-    plt.legend()
-
-
+   
     for i in range(0,len(unstitched_lc_regression)):
 
         last_time = unstitched_lc_regression[i][:,0][-1]
 
         plt.axvline(x=last_time,color='k',linestyle='--')
 
-    plt.savefig('regression_program_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_full_corr_lcs.pdf',format='pdf')
+    if systematics_correction_method == 1:
+        plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_stitched_hybrid_corr_lc.pdf',format='pdf')
+    elif systematics_correction_method == 2:
+        plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_stitched_PCA_corr_lc.pdf',format='pdf')
 
     plt.show()
     print ("Done!")
