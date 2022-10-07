@@ -502,14 +502,15 @@ else:
 
                     num_pixels_faint = np.count_nonzero(allfaint_mask)
                     num_pixels_mask = np.count_nonzero(aper_mod)
+                    percent_of_bg_in_src = num_pixels_mask / num_pixels_faint
 
                     lc_bg_time = lc_bg.time.value
                     lc_bg_flux = lc_bg.flux.value
                     lc_bg_fluxerr = lc_bg.flux_err.value
 
-                    lc_bg_flux_scaled = (lc_bg_flux / num_pixels_faint) * num_pixels_mask
+                    lc_bg_scaled = lc_bg_flux - (1-percent_of_bg_in_src)*lc_bg_flux
 
-                    lc.flux = lc.flux.value - lc_bg_flux_scaled
+                    lc.flux = lc.flux.value - lc_bg_scaled
 
                     #Replace any errors that are zero or negative with the mean error:
 
@@ -523,13 +524,25 @@ else:
                     corrector_1 = lk.RegressionCorrector(lc)
                     clc = corrector_1.correct(dm_mult)
 
-                    #Now, in order that the final light curve has a median flux similar to the pre-subtracted flux,
-                    #while maintaining the percent-amplitude of the variability by using a multiplicative scaling.
+                    #The background subtraction can sometimes cause fluxes below the source's median
+                    #to be slightly negative; this enforces a minimum of zero, but can be ignored.
+
+                    if np.min(clc.flux.value) < 0:
+
+                        dist_to_zero = np.abs(np.min(clc.flux.value))
+                        clc.flux = clc.flux.value + dist_to_zero
+
+                    #Now, we provide an optional rescaling, in order that the final light curve has a median flux similar to the pre-subtracted flux.
+                    #This should be used with caution, as they affect the percent variability of the source
 
                     median_flux_postsub = np.median(clc.flux.value)
-                    multiplicative_rescale_factor = median_flux_precorr / median_flux_postsub
-                    clc.flux = clc.flux.value * multiplicative_rescale_factor
+                    
+                    ######### OPTIONAL ADDITIVE CORRECTION BACK TO ORIGINAL MEDIAN ########
+                    additive_rescale_factor = median_flux_precorr - median_flux_postsub
+                    #clc.flux = clc.flux.value + additive_rescale_factor    #uncomment if you want to use this.
 
+                    var_amplitude = np.max(clc.flux.value) - np.min(clc.flux.value)
+                    percent_variability = (var_amplitude / median_flux_precorr)*100
                     
                     #Now we begin the simpler method of using PCA components of all non-source pixels.
 
@@ -551,10 +564,6 @@ else:
 
                     corrector_pca_OF = lk.RegressionCorrector(raw_lc_OF)
                     corrected_lc_pca_OF = corrector_pca_OF.correct(dm_pca_OF)
-
-                #    model_pca5_OF = corrector_pca5_OF.model_lc
-                    #model_pca5_OF -= np.percentile(model_pca5_OF.flux,5)
-                #    corrected_lc_pca5_OF = raw_lc_OF - model_pca5_OF
 
                     #AND PLOT THE CORRECTED LIGHT CURVE.
 
@@ -586,9 +595,6 @@ else:
 
                     tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
-                    # print("\n")
-
-                    ### Keeping track of what relative sector is being observed, keeps figures from experiencing FileExistsError
                     ## This section creates individual directories for each object in which the quaver procesed light curve data is stored
                     ##  then saves the corrected lightcurves along with additive and multiplicative components as well as the aperture selection
 
@@ -632,6 +638,8 @@ else:
 
                     print("Sector, CCD, camera: ")
                     print(sector_number,ccd,cam)
+                    
+                    print("Percent variability before background subtraction: "+str(round(percent_variability,2))+"%")
 
     #############################################
     #############################################
