@@ -719,11 +719,11 @@ else:
 
         else:
 
-            first_flux_raw = f_raw[0]
+            first_flux_raw = np.mean(f_raw[:10])
             first_flux_reg = np.mean(f_reg[:10])
             first_flux_pca = np.mean(f_pca[:10])
 
-            last_flux_raw = full_lc_flux_raw[-1]
+            last_flux_raw = np.mean(full_lc_flux_raw[-10:])
             last_flux_reg = np.mean(full_lc_flux_reg[-10:])
             last_flux_pca = np.mean(full_lc_flux_pca[-10:])
 
