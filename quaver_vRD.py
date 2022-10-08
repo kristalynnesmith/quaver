@@ -820,7 +820,7 @@ else:
     regression_lc = np.column_stack((full_lc_time_reg,full_lc_flux_reg,full_lc_err_reg))
     pca5_lc = np.column_stack((full_lc_time_pca,full_lc_flux_pca,full_lc_err_pca))
 
-    np.savetxt('quaver_program_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
+    np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_full_raw_lc.dat',raw_lc)
     if systematics_correction_method == 1:
         np.savetxt('quaver_output/'+target_safename+'/'+target_safename+'_cycle'+str(cycle)+'_hybrid_lc.dat',regression_lc)
     elif systematics_correction_method == 2:
