@@ -51,9 +51,10 @@ additive_pca_num = 3
 multiplicative_pca_num = 3
 pca_only_num = 3
 
-#Lowest DSS contour level, as fraction of peak brightness
+#Lowest DSS contour level, as fraction of peak brightness in DSS image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
-lowest_dss_contour = 0.4
+#This number must be less than 0.65.
+lowest_dss_contour = 0.6
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
@@ -65,6 +66,9 @@ max_masked_regions = 5 #set maximum number of regions of the light curve that ca
 #(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
 plot_index = 500
 
+#Threshold, in multiples of sigma times the median of the flux across the entire TPF,
+#that divides bright from faint pixels in the calculation of principal components.
+bf_threshold = 1.5
 
 ############################################
 
@@ -353,8 +357,10 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
             if lowest_dss_contour == 0.4:
                 dss_levels = [0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
-            else:
+            elif lowest_dss_contour < 0.4:
                 dss_levels = [lowest_dss_contour*dss_pixmax,0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
+            elif lowest_dss_contour > 0.4:
+                dss_levels = [lowest_dss_contour*dss_pixmax,0.65*dss_pixmax,0.85*dss_pixmax]
 
             fig = plt.figure(figsize=(8,8))
             ax = fig.add_subplot(111,projection=tpf_wcs)
@@ -405,7 +411,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
 
                 #Create a mask that finds all of the bright, source-containing regions of the TPF.
-                allbright_mask = tpf.create_threshold_mask(threshold=1.5,reference_pixel=None)
+                allbright_mask = tpf.create_threshold_mask(threshold=bf_threshold,reference_pixel=None)
                 allfaint_mask = ~allbright_mask
 
                 allbright_mask &= ~aper_buffer
