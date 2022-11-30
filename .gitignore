@@ -4,3 +4,5 @@
 *.dat
 regression_program_output/*
 quaver_output/*
+lc_stitcher.py
+remove_jumps.py
