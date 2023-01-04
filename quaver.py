@@ -54,7 +54,7 @@ pca_only_num = 3
 #Lowest DSS contour level, as fraction of peak brightness in DSS image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
 #This number must be less than 0.65.
-lowest_dss_contour = 0.6
+lowest_dss_contour = 0.4
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
