@@ -2,7 +2,13 @@
 ######
 import os
 import http
-import lightkurve as lk
+#import lightkurve as lk
+from lightkurve import search_tesscut
+from lightkurve import DesignMatrix
+from lightkurve import DesignMatrixCollection
+from lightkurve import RegressionCorrector
+from lightkurve import LightCurve
+
 import numpy as np
 import re
 import sys
@@ -54,7 +60,7 @@ pca_only_num = 3
 #Lowest DSS contour level, as fraction of peak brightness in DSS image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
 #This number must be less than 0.65.
-lowest_dss_contour = 0.4
+lowest_dss_contour = 0.5
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
@@ -64,7 +70,7 @@ max_masked_regions = 5 #set maximum number of regions of the light curve that ca
 
 #Which cadence of the TESSCut file is used for the aperture selection panel
 #(It is best to avoid the first or last cadences as they are often hard to see due to systematics)
-plot_index = 500
+plot_index = 200
 
 #Threshold, in multiples of sigma times the median of the flux across the entire TPF,
 #that divides bright from faint pixels in the calculation of principal components.
@@ -222,7 +228,7 @@ dss_dec = dss_head['CRVAL2']
 
 
 #Retrieve the available tesscut data for FFI-only targets.
-sector_data = lk.search_tesscut(target_coordinates)
+sector_data = search_tesscut(target_coordinates)
 num_obs_sectors = len(sector_data)
 
 if num_obs_sectors == 0:
@@ -365,7 +371,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
             fig = plt.figure(figsize=(8,8))
             ax = fig.add_subplot(111,projection=tpf_wcs)
             # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
-            ax.imshow(tpf.flux[plot_index],vmin=temp_min,vmax=temp_max)
+            ax.imshow(tpf.flux[plot_index].value,vmin=temp_min,vmax=temp_max)
             ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=dss_levels,colors='white',alpha=0.9)
             ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
 
@@ -440,7 +446,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 additive_hybrid_pcas = additive_pca_num
 
-                additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
+                additive_bkg = DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                 additive_bkg_and_constant = additive_bkg.append_constant()
 
                 #Add a module to catch possible major systematics that need to be masked out before continuuing:
@@ -479,7 +485,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                             tpf = tpf[cadence_mask]
 
-                            additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
+                            additive_bkg = DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                             additive_bkg_and_constant = additive_bkg.append_constant()
 
                             print(np.max(np.abs(additive_bkg.values)))
@@ -521,7 +527,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                                         tpf = tpf[cadence_mask]
 
-                                        additive_bkg = lk.DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
+                                        additive_bkg = DesignMatrix(tpf.flux[:, allfaint_mask]).pca(additive_hybrid_pcas)
                                         additive_bkg_and_constant = additive_bkg.append_constant()
 
                                     else:
@@ -530,11 +536,12 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 # Now we correct all the bright pixels EXCLUDING THE SOURCE by the background, so we can find the remaining multiplicative trend
 
-                r = lk.RegressionCorrector(lk.LightCurve(time=tpf.time, flux=tpf.time.value*0))
+                r = RegressionCorrector(LightCurve(time=tpf.time, flux=tpf.time.value*0))
 
                 corrected_pixels = []
                 for idx in range(allbright_mask.sum()):
                     r.lc.flux = tpf.flux[:, allbright_mask][:, idx]
+                    r.lc.flux_err = tpf.flux_err[:, allbright_mask][:, idx]
                     r.correct(additive_bkg_and_constant)
                     corrected_pixels.append(r.corrected_lc.flux)
 
@@ -542,7 +549,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 #Getting the multiplicative effects now from the bright pixels.
 
                 multiplicative_hybrid_pcas = multiplicative_pca_num
-                multiplicative_bkg = lk.DesignMatrix(np.asarray(corrected_pixels).T).pca(multiplicative_hybrid_pcas)
+                multiplicative_bkg = DesignMatrix(np.asarray(corrected_pixels).T).pca(multiplicative_hybrid_pcas)
 
                 #Create a design matrix using only the multiplicative components determined from the additively-corrected bright sources for simple hybrid method:
                 dm_mult = multiplicative_bkg
@@ -577,10 +584,11 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 mean_error = np.mean(lc.flux_err[np.isfinite(lc.flux_err)])
                 lc.flux_err = np.where(lc.flux_err == 0,mean_error,lc.flux_err)
                 lc.flux_err = np.where(lc.flux_err < 0,mean_error,lc.flux_err)
+                lc.flux_err = lc.flux_err.value
 
                 #And correct regressively for the multiplicative effects in the simple hybrid method:
 
-                corrector_1 = lk.RegressionCorrector(lc)
+                corrector_1 = RegressionCorrector(lc)
                 clc = corrector_1.correct(dm_mult)
 
                 #The background subtraction can sometimes cause fluxes below the source's median
@@ -607,9 +615,9 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 additive_bkg_squared = deepcopy(additive_bkg)
                 additive_bkg_squared.df = additive_bkg_squared.df**2
 
-                dmc = lk.DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
+                dmc = DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
                 lc_full = tpf.to_lightcurve(aperture_mask=aper_mod)
-                clc_full = lk.RegressionCorrector(lc_full).correct(dmc)
+                clc_full = RegressionCorrector(lc_full).correct(dmc)
 
 
 
@@ -627,11 +635,11 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 number_of_pcas = pca_only_num
 
-                dm_OF = lk.DesignMatrix(regressors_OF,name='regressors')
+                dm_OF = DesignMatrix(regressors_OF,name='regressors')
                 dm_pca_OF = dm_OF.pca(pca_only_num)
                 dm_pca_OF = dm_pca_OF.append_constant()
 
-                corrector_pca_OF = lk.RegressionCorrector(raw_lc_OF)
+                corrector_pca_OF = RegressionCorrector(raw_lc_OF)
                 corrected_lc_pca_OF = corrector_pca_OF.correct(dm_pca_OF)
 
                 #AND PLOT THE CORRECTED LIGHT CURVE.
