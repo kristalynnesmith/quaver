@@ -350,6 +350,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
             temp_min = float(pixmin)
             # print(temp_min)
             temp_max = float(1e-3*pixmax+pixmean)
+            #temp_max = pixmax
             # print(temp_max)
 
             #Create a blank boolean array for the aperture, which will turn to TRUE when pixels are selected.
@@ -667,13 +668,12 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 elif primary_correction_method == 3:
                     clc_full.plot(ax=f_ax1)
-
                 if primary_correction_method == 1:
-                    f_ax2.plot(dm_pca_OF.values[:,0:-1])
+                    f_ax2.plot(raw_lc_OF.time.value,dm_pca_OF.values[:,0:-1])
 
                 elif primary_correction_method == 2 or primary_correction_method == 3:
-                    f_ax2.plot(additive_bkg.values)
-                    f_ax3.plot(multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
+                    f_ax2.plot(raw_lc_OF.time.value,additive_bkg.values)
+                    f_ax3.plot(raw_lc_OF.time.value,multiplicative_bkg.values + np.arange(multiplicative_bkg.values.shape[1]) * 0.3)
 
                 tpf.plot(ax=f_ax4,aperture_mask=aper_mod,title='Aperture')
 
