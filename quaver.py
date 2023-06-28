@@ -168,21 +168,26 @@ def lc_stitch(unstitched_lc):
 #Define function to remove single-cadence jumps of greater or lesser than 1% of the flux on either side.
 def remove_jumps(t,f,err):
 
-    for i in range(0,1-len(t)):
-
+    jump_idx = []
+    for i in range(0,len(t)-1):
+        
         if i !=0 and i != len(f)-1 and f[i] > (0.01 * f[i-1]+f[i-1]) and f[i] > (0.01 * f[i+1] + f[i+1]):
 
-            t = np.delete(t,i)
-            f = np.delete(f,i)
-            err = np.delete(err,i)
+            jump_idx.append(i)
 
-    for i in range(0,1-len(t)):
+    for i in range(0,len(t)-1):
 
         if i !=0 and i != len(f)-1 and f[i] < (f[i-1] - 0.01 * f[i-1]) and f[i] < (f[i+1]-0.01 * f[i+1]):
 
-            t = np.delete(t,i)
-            f = np.delete(f,i)
-            err = np.delete(err,i)
+            jump_idx.append(i)
+            
+    count = 0
+    for idx in jump_idx: 
+        
+        t = np.delete(t,i - count)
+        f = np.delete(f,i - count)
+        err = np.delete(err,i - count)
+        count += 1
 
     return t,f,err
 ##############################################
