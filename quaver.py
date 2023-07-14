@@ -49,8 +49,8 @@ import astropy.io.fits as pyfits
 
 primary_correction_method = 2
 
-#Size of the TPF postage stamp to download and use for exraction and detrending.
-tpf_width_height = 25
+#Size of the TPF postage stamp to download and use for extraction and detrending.
+tpf_width_height = 15
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -75,6 +75,11 @@ plot_index = 200
 #Threshold, in multiples of sigma times the median of the flux across the entire TPF,
 #that divides bright from faint pixels in the calculation of principal components.
 bf_threshold = 1.5
+
+#Whether Lightkurve should attempt to propagate the flux errors during the matrix correction.
+#Note that this can significantly increase the runtime. Witout this, errors in output will be
+#photometric flux errors reported from the TESSCut and propagated only from extraction.
+prop_error_flag = False
 
 ############################################
 
@@ -541,9 +546,9 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 corrected_pixels = []
                 for idx in range(allbright_mask.sum()):
-                    r.lc.flux = tpf.flux[:, allbright_mask][:, idx]
-                    r.lc.flux_err = tpf.flux_err[:, allbright_mask][:, idx]
-                    r.correct(additive_bkg_and_constant)
+                    r.lc.flux = tpf.flux[:, allbright_mask][:, idx].value
+                    r.lc.flux_err = tpf.flux_err[:, allbright_mask][:, idx].value
+                    r.correct(additive_bkg_and_constant, propagate_errors=prop_error_flag)
                     corrected_pixels.append(r.corrected_lc.flux)
 
 
@@ -590,7 +595,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 #And correct regressively for the multiplicative effects in the simple hybrid method:
 
                 corrector_1 = RegressionCorrector(lc)
-                clc = corrector_1.correct(dm_mult)
+                clc = corrector_1.correct(dm_mult,propagate_errors=prop_error_flag)
 
                 #The background subtraction can sometimes cause fluxes below the source's median
                 #to be slightly negative; this enforces a minimum of zero, but can be ignored.
@@ -618,9 +623,14 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 dmc = DesignMatrixCollection([additive_bkg_and_constant, additive_bkg_squared, multiplicative_bkg])
                 lc_full = tpf.to_lightcurve(aperture_mask=aper_mod)
-                clc_full = RegressionCorrector(lc_full).correct(dmc)
 
+                r2 = RegressionCorrector(lc_full)
 
+                r2.lc.flux = lc_full.flux.value
+                r2.lc.flux_err = lc_full.flux_err.value
+                clc_full = r2.correct(dmc,propagate_errors=prop_error_flag)
+
+                #clc_full = RegressionCorrector(lc_full).correct(dmc,propagate_errors=prop_error_flag)
 
                 #Now we begin the SIMPLE PCA METHOD with components of all non-source pixels.
 
@@ -640,8 +650,12 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 dm_pca_OF = dm_OF.pca(pca_only_num)
                 dm_pca_OF = dm_pca_OF.append_constant()
 
-                corrector_pca_OF = RegressionCorrector(raw_lc_OF)
-                corrected_lc_pca_OF = corrector_pca_OF.correct(dm_pca_OF)
+                r3 = RegressionCorrector(raw_lc_OF)
+
+                r3.lc.flux = raw_lc_OF.flux.value
+                r3.lc.flux_err = raw_lc_OF.flux_err.value
+
+                corrected_lc_pca_OF = r3.correct(dm_pca_OF,propagate_errors=prop_error_flag)
 
                 #AND PLOT THE CORRECTED LIGHT CURVE.
 
