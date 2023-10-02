@@ -47,10 +47,10 @@ import astropy.io.fits as pyfits
 #  2 = simple hybrid reduction
 #  3 = full hybrid reduction
 
-primary_correction_method = 2
+primary_correction_method = 3
 
 #Size of the TPF postage stamp to download and use for extraction and detrending.
-tpf_width_height = 15
+tpf_width_height = 25
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -63,7 +63,7 @@ pca_only_num = 3
 lowest_dss_contour = 0.5
 
 #Acceptable threshold for systematics in additive components:
-sys_threshold = 0.2
+sys_threshold = 0.1
 
 #Maximum number of cadence-mask regions allowed:
 max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
@@ -79,7 +79,7 @@ bf_threshold = 1.5
 #Whether Lightkurve should attempt to propagate the flux errors during the matrix correction.
 #Note that this can significantly increase the runtime. Witout this, errors in output will be
 #photometric flux errors reported from the TESSCut and propagated only from extraction.
-prop_error_flag = False
+prop_error_flag = True
 
 ############################################
 
@@ -597,6 +597,11 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 corrector_1 = RegressionCorrector(lc)
                 clc = corrector_1.correct(dm_mult,propagate_errors=prop_error_flag)
 
+                #Compute over- and under-fitting metrics using Lightkurve's lombscargle and neighbors methods:
+                corrector_1.original_lc = corrector_1.lc
+                sh_overfit_metric = corrector_1.compute_overfit_metric()
+                #sh_underfit_metric = corrector_1.compute_underfit_metric() #Has to wait until we make our own using quaver-derived light curves of nearby targets.
+
                 #The background subtraction can sometimes cause fluxes below the source's median
                 #to be slightly negative; this enforces a minimum of zero, but can be ignored.
 
@@ -630,6 +635,12 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 r2.lc.flux_err = lc_full.flux_err.value
                 clc_full = r2.correct(dmc,propagate_errors=prop_error_flag)
 
+                #Compute over- and under-fitting metrics using Lightkurve's lombscargle and neighbors methods:
+                r2.original_lc = r2.lc
+                fh_overfit_metric = r2.compute_overfit_metric()
+                #fh_underfit_metric = r2.compute_underfit_metric()  #Has to wait until we make our own using quaver-derived light curves of nearby targets.
+
+
                 #clc_full = RegressionCorrector(lc_full).correct(dmc,propagate_errors=prop_error_flag)
 
                 #Now we begin the SIMPLE PCA METHOD with components of all non-source pixels.
@@ -656,6 +667,11 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 r3.lc.flux_err = raw_lc_OF.flux_err.value
 
                 corrected_lc_pca_OF = r3.correct(dm_pca_OF,propagate_errors=prop_error_flag)
+
+                #Compute over- and under-fitting metrics using Lightkurve's lombscargle and neighbors methods:
+                r3.original_lc = r3.lc
+                pca_overfit_metric = r3.compute_overfit_metric()
+                #pca_underfit_metric = r3.compute_underfit_metric()  #Has to wait until we make our own using quaver-derived light curves of nearby targets.
 
                 #AND PLOT THE CORRECTED LIGHT CURVE.
 
@@ -738,8 +754,70 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
                 print("Sector, CCD, camera: ")
                 print(sector_number,ccd,cam)
+                print('\n')
 
-                print("Percent variability before background subtraction: "+str(round(percent_variability,2))+"%")
+                print("Over- and underfitting metrics: ")
+                print('Full hybrid overfit: '+str(fh_overfit_metric))
+                #print('Full hybrid underfit: '+str(fh_underfit_metric)+'\n')
+
+                print('Simple hybrid overfit: '+str(sh_overfit_metric))
+                #print('Simple hybrid underfit: '+str(sh_underfit_metric)+'\n')
+
+                print('Simple PCA overfit: '+str(pca_overfit_metric))
+                #print('Simple PCA underfit: '+str(pca_underfit_metric)+'\n')
+
+
+                #Plot the resultant fit (matrices multiplied by the final coefficients) for each model with the original and final curves.
+                sh_coeffs = corrector_1.coefficients
+                fh_coeffs = r2.coefficients
+                pca_coeffs = r3.coefficients
+
+                #Compute Simple Hybrid total model:
+                total_fit_sh = sh_coeffs[0]*corrector_1.dmc.matrices[0][0]+sh_coeffs[1]*corrector_1.dmc.matrices[0][1]+sh_coeffs[2]*corrector_1.dmc.matrices[0][2]+sh_coeffs[3]
+
+                #Compute Full Hybrid total model:
+                first_set = fh_coeffs[0]*r2.dmc.matrices[0][0] + fh_coeffs[1]*r2.dmc.matrices[0][1] + fh_coeffs[2]*r2.dmc.matrices[0][2] +fh_coeffs[3]
+                second_set = fh_coeffs[4]*r2.dmc.matrices[1][0] + fh_coeffs[5]*r2.dmc.matrices[1][1] + fh_coeffs[6]*r2.dmc.matrices[1][2]
+                third_set = fh_coeffs[7]*r2.dmc.matrices[2][0] + fh_coeffs[8]*r2.dmc.matrices[2][1] + fh_coeffs[9]*r2.dmc.matrices[2][2]
+                total_fit_fh = first_set+second_set+third_set
+
+                #Compute PCA total model:
+                total_fit_pca = pca_coeffs[0]*r3.dmc.matrices[0][0]+pca_coeffs[1]*r3.dmc.matrices[0][1]+pca_coeffs[2]*r3.dmc.matrices[0][2]+pca_coeffs[3]
+
+                #Plot the FH diagnostic:
+                clc_full.plot(color='k',label='Corrected')
+                plt.plot(lc.time.value,lc_full.flux.value,color='firebrick',label='Uncorrected')
+                plt.plot(lc.time.value,total_fit_fh,color='cyan',label='Final Model')
+                plt.legend()
+                plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_FitDiagnostic_sector_'+sec+'full_hybrid.pdf',format='pdf')
+                plt.close()
+
+                #Plot the SH diagnostic:
+                plot_scale_factor = np.median(lc_full.flux.value) - np.median(lc_bg_scaled)
+                if plot_scale_factor > 0:
+                    lc_bg_plot = lc_bg_scaled + plot_scale_factor
+                else:
+                    lc_bg_plot = lc_bg_scaled - plot_scale_factor
+
+                _, axs = plt.subplots(2, figsize=(10, 6), sharex=True)
+                ax = axs[0]
+                lc_full.plot(ax=ax,color='firebrick',label='Uncorrected')
+                ax.plot(lc.time.value,lc_bg_plot,color='magenta',label='Subtracted Background')
+                ax.legend()
+                ax = axs[1]
+                clc.plot(ax=ax,color='k',label='Corrected')
+                ax.plot(lc.time.value,total_fit_sh,color='cyan',label='Multiplicative Model')
+                ax.legend()
+                plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_FitDiagnostic_sector_'+sec+'simple_hybrid.pdf',format='pdf')
+                plt.close()
+
+                #Plot the PCA diagnostic:
+                corrected_lc_pca_OF.plot(color='k',label='Corrected')
+                plt.plot(lc.time.value,raw_lc_OF.flux.value,color='firebrick',label='Uncorrected')
+                plt.plot(lc.time.value,total_fit_pca,color='cyan',label='Final Model')
+                plt.legend()
+                plt.savefig('quaver_output/'+target_safename+'/'+target_safename+'_FitDiagnostic_sector_'+sec+'_PCA.pdf',format='pdf')
+                plt.close()
 
                 print("\nMoving to next sector.\n")
 
