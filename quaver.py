@@ -63,7 +63,7 @@ pca_only_num = 3
 lowest_dss_contour = 0.5
 
 #Acceptable threshold for systematics in additive components:
-sys_threshold = 0.1
+sys_threshold = 0.2
 
 #Maximum number of cadence-mask regions allowed:
 max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
@@ -773,16 +773,41 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
                 pca_coeffs = r3.coefficients
 
                 #Compute Simple Hybrid total model:
-                total_fit_sh = sh_coeffs[0]*corrector_1.dmc.matrices[0][0]+sh_coeffs[1]*corrector_1.dmc.matrices[0][1]+sh_coeffs[2]*corrector_1.dmc.matrices[0][2]+sh_coeffs[3]
+                for i in range(0,multiplicative_hybrid_pcas):
+                    if i ==0:
+                        total_fit_sh = sh_coeffs[i]*corrector_1.dmc.matrices[0][i]
+                    else:
+                        total_fit_sh = total_fit_sh+sh_coeffs[i]*corrector_1.dmc.matrices[0][i]
 
                 #Compute Full Hybrid total model:
-                first_set = fh_coeffs[0]*r2.dmc.matrices[0][0] + fh_coeffs[1]*r2.dmc.matrices[0][1] + fh_coeffs[2]*r2.dmc.matrices[0][2] +fh_coeffs[3]
-                second_set = fh_coeffs[4]*r2.dmc.matrices[1][0] + fh_coeffs[5]*r2.dmc.matrices[1][1] + fh_coeffs[6]*r2.dmc.matrices[1][2]
-                third_set = fh_coeffs[7]*r2.dmc.matrices[2][0] + fh_coeffs[8]*r2.dmc.matrices[2][1] + fh_coeffs[9]*r2.dmc.matrices[2][2]
-                total_fit_fh = first_set+second_set+third_set
+                length_matrix_1 = np.shape(r2.dmc.matrices[0])[1]
+                length_matrix_2 = np.shape(r2.dmc.matrices[1])[1]
+                length_matrix_3 = np.shape(r2.dmc.matrices[2])[1]
+
+                for j in range(0,3):
+                    if j == 0:
+                        for i in range(0,length_matrix_1-1):
+                            if i == 0:
+                                total_fit_fh = fh_coeffs[i]*r2.dmc.matrices[j][i]
+                            else:
+                                total_fit_fh = total_fit_fh + fh_coeffs[i]*r2.dmc.matrices[j][i]
+                    elif j == 1:
+                        for i in range(length_matrix_1,length_matrix_1+length_matrix_2):
+                            for k in range(0,length_matrix_2):
+                                total_fit_fh = total_fit_fh + fh_coeffs[i]*r2.dmc.matrices[j][k]
+
+                    elif j == 2:
+                        for i in range(length_matrix_1+length_matrix_2,len(fh_coeffs)):
+                            for k in range(0,length_matrix_3):
+                                total_fit_fh = total_fit_fh + fh_coeffs[i]*r2.dmc.matrices[j][k]
 
                 #Compute PCA total model:
-                total_fit_pca = pca_coeffs[0]*r3.dmc.matrices[0][0]+pca_coeffs[1]*r3.dmc.matrices[0][1]+pca_coeffs[2]*r3.dmc.matrices[0][2]+pca_coeffs[3]
+                for i in range(0,pca_only_num):
+                    if i ==0:
+                        total_fit_pca = pca_coeffs[i]*r3.dmc.matrices[0][i]
+                    else:
+                        total_fit_pca = total_fit_pca+pca_coeffs[i]*r3.dmc.matrices[0][i]
+
 
                 #Plot the FH diagnostic:
                 clc_full.plot(color='k',label='Corrected')
