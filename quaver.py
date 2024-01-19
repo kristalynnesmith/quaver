@@ -250,6 +250,7 @@ print('Cycle 2: Sectors 14-26')
 print('Cycle 3: Sectors 27-39')
 print('Cycle 4: Sectors 40-55')
 print('Cycle 5: Sectors 56-69')
+print('Cycle 6: Sectors 70-83')
 
 #Set cycle of interest, while making sure the chosen cycle corresponds to actual observed sectors:
 
@@ -259,8 +260,8 @@ while check_cycle == False:
 
     cycle = int(input('Enter Cycle: '))
 
-    first_sectors = [1,14,27,40,56]
-    last_sectors = [13,26,39,55,69]
+    first_sectors = [1,14,27,40,56,70]
+    last_sectors = [13,26,39,55,69,83]
 
     if cycle == 1:
         first_sector = first_sectors[0]
@@ -277,6 +278,9 @@ while check_cycle == False:
     elif cycle==5:
         first_sector = first_sectors[4]
         last_sector = last_sectors[4]
+    elif cycle==6:
+        first_sector = first_sectors[5]
+        last_sector = last_sectors[5]
 
     else:
         print('Invalid Cycle Number')
