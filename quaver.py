@@ -50,7 +50,7 @@ import astropy.io.fits as pyfits
 primary_correction_method = 3
 
 #Size of the TPF postage stamp to download and use for extraction and detrending.
-tpf_width_height = 25
+tpf_width_height = 35
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -251,6 +251,7 @@ print('Cycle 3: Sectors 27-39')
 print('Cycle 4: Sectors 40-55')
 print('Cycle 5: Sectors 56-69')
 print('Cycle 6: Sectors 70-83')
+print('Cycle 7: Sectors 84-96')
 
 #Set cycle of interest, while making sure the chosen cycle corresponds to actual observed sectors:
 
@@ -260,8 +261,8 @@ while check_cycle == False:
 
     cycle = int(input('Enter Cycle: '))
 
-    first_sectors = [1,14,27,40,56,70]
-    last_sectors = [13,26,39,55,69,83]
+    first_sectors = [1,14,27,40,56,70,84]
+    last_sectors = [13,26,39,55,69,83,96]
 
     if cycle == 1:
         first_sector = first_sectors[0]
@@ -281,6 +282,9 @@ while check_cycle == False:
     elif cycle==6:
         first_sector = first_sectors[5]
         last_sector = last_sectors[5]
+    elif cycle==7:
+            first_sector = first_sectors[6]
+            last_sector = last_sectors[6]
 
     else:
         print('Invalid Cycle Number')
@@ -376,7 +380,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
             elif lowest_dss_contour < 0.4:
                 dss_levels = [lowest_dss_contour*dss_pixmax,0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
             elif lowest_dss_contour > 0.4:
-                dss_levels = [lowest_dss_contour*dss_pixmax,0.65*dss_pixmax,0.85*dss_pixmax]
+                dss_levels = [lowest_dss_contour*dss_pixmax,0.65*dss_pixmax,0.85*dss_pixmax,0.9*dss_pixmax,0.95*dss_pixmax]
 
             fig = plt.figure(figsize=(8,8))
             ax = fig.add_subplot(111,projection=tpf_wcs)
