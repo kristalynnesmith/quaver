@@ -50,7 +50,7 @@ import astropy.io.fits as pyfits
 primary_correction_method = 3
 
 #Size of the TPF postage stamp to download and use for extraction and detrending.
-tpf_width_height = 35
+tpf_width_height = 25
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -60,7 +60,7 @@ pca_only_num = 3
 #Lowest DSS contour level, as fraction of peak brightness in DSS image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
 #This number must be less than 0.65.
-lowest_dss_contour = 0.5
+lowest_dss_contour = 0.3
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
@@ -175,7 +175,7 @@ def remove_jumps(t,f,err):
 
     jump_idx = []
     for i in range(0,len(t)-1):
-        
+
         if i !=0 and i != len(f)-1 and f[i] > (0.01 * f[i-1]+f[i-1]) and f[i] > (0.01 * f[i+1] + f[i+1]):
 
             jump_idx.append(i)
@@ -185,10 +185,10 @@ def remove_jumps(t,f,err):
         if i !=0 and i != len(f)-1 and f[i] < (f[i-1] - 0.01 * f[i-1]) and f[i] < (f[i+1]-0.01 * f[i+1]):
 
             jump_idx.append(i)
-            
+
     count = 0
-    for idx in jump_idx: 
-        
+    for idx in jump_idx:
+
         t = np.delete(t,i - count)
         f = np.delete(f,i - count)
         err = np.delete(err,i - count)
