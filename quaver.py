@@ -26,6 +26,10 @@ from astropy.wcs import *
 from astropy import units as u
 import astropy.io.fits as pyfits
 
+import pyvo as vo
+from astropy.nddata import Cutout2D
+from astropy.utils.data import download_file
+
 #################
 #################
 
@@ -49,6 +53,12 @@ import astropy.io.fits as pyfits
 
 primary_correction_method = 3
 
+#Source of contours to aid with selection of aperture:
+
+contour_image_source = 'twomass'
+#contour_image_source = 'dss'
+
+
 #Size of the TPF postage stamp to download and use for extraction and detrending.
 tpf_width_height = 25
 
@@ -57,10 +67,13 @@ additive_pca_num = 3
 multiplicative_pca_num = 3
 pca_only_num = 3
 
-#Lowest DSS contour level, as fraction of peak brightness in DSS image.
+#Lowest contour level for DSS images, if using, as fraction of peak brightness in contour image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
 #This number must be less than 0.65.
-lowest_dss_contour = 0.3
+lowest_dss_contour = 0.4
+
+#Lowest contour level for 2MASS images, if using, as a percentage of the mean background. Default is 5%.
+lowest_twomass_contour = 0.05
 
 #Acceptable threshold for systematics in additive components:
 sys_threshold = 0.2
@@ -225,16 +238,31 @@ except NameResolveError:
     print("\n")
 
 
+if contour_image_source == 'dss':
+    dss_image = SkyView.get_images(position=source_coordinates,survey='DSS',pixels=str(400))
 
-dss_image = SkyView.get_images(position=source_coordinates,survey='DSS',pixels=str(400))
-wcs_dss = WCS(dss_image[0][0].header)
-dss_pixmin = np.min(dss_image[0][0].data)
-dss_pixmax = np.max(dss_image[0][0].data)
-dss_pixmean = np.mean(dss_image[0][0].data)
+    wcs_dss = WCS(dss_image[0][0].header)
+    cpixmin = np.min(dss_image[0][0].data)
+    cpixmax = np.max(dss_image[0][0].data)
+    cpixmean = np.mean(dss_image[0][0].data)
 
-dss_head = dss_image[0][0].header
-dss_ra = dss_head['CRVAL1']
-dss_dec = dss_head['CRVAL2']
+    dss_head = dss_image[0][0].header
+    dss_ra = dss_head['CRVAL1']
+    dss_dec = dss_head['CRVAL2']
+
+elif contour_image_source == 'twomass':
+    twomass_service = vo.dal.SIAService("https://irsa.ipac.caltech.edu/cgi-bin/2MASS/IM/nph-im_sia?type=at&ds=asky&")
+    im_table = twomass_service.search(pos=source_coordinates, size=3.0*u.arcsec)
+    fname = download_file(im_table[0].getdataurl(), cache=True)
+    image1 = pyfits.open(fname)
+    wcs_twomass = WCS(image1[0].header)
+    num_arcsec = int(tpf_width_height*20)
+    twomass_image = Cutout2D(image1[0].data, source_coordinates, (num_arcsec, num_arcsec), wcs=wcs_twomass)
+    wcs_twomass = twomass_image.wcs
+
+    cpixmin = np.nanmin(twomass_image.data)
+    cpixmax = np.nanmax(twomass_image.data)
+    cpixmean = np.nanmean(twomass_image.data)
 
 
 #Retrieve the available tesscut data for FFI-only targets.
@@ -379,19 +407,27 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
             aper_width = tpf[0].shape[1]
             #Plot the TPF image and the DSS contours together, to help with aperture selection, along with the starter aperture.
-
-            if lowest_dss_contour == 0.4:
-                dss_levels = [0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
-            elif lowest_dss_contour < 0.4:
-                dss_levels = [lowest_dss_contour*dss_pixmax,0.4*dss_pixmax,0.5*dss_pixmax,0.75*dss_pixmax]
-            elif lowest_dss_contour > 0.4:
-                dss_levels = [lowest_dss_contour*dss_pixmax,0.65*dss_pixmax,0.85*dss_pixmax,0.9*dss_pixmax,0.95*dss_pixmax]
+            if contour_image_source == 'dss':
+                if lowest_dss_contour == 0.4:
+                    clevels = [0.4*cpixmax,0.5*cpixmax,0.75*cpixmax]
+                elif lowest_dss_contour < 0.4:
+                    clevels = [lowest_dss_contour*cpixmax,0.4*cpixmax,0.5*cpixmax,0.75*cpixmax]
+                elif lowest_dss_contour > 0.4:
+                    clevels = [lowest_dss_contour*cpixmax,0.65*cpixmax,0.85*cpixmax,0.9*cpixmax,0.95*cpixmax]
+            elif contour_image_source == 'twomass':
+                n = lowest_twomass_contour
+                clevels = [(1+n)*cpixmean,(1+2*n)*cpixmean,(1+6*n)*cpixmean,(1+10*n)*cpixmean]
 
             fig = plt.figure(figsize=(8,8))
             ax = fig.add_subplot(111,projection=tpf_wcs)
             # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
+            #clevels = [1.05*cpixmean,1.10*cpixmean,1.3*cpixmean,1.5*cpixmean]
+
             ax.imshow(tpf.flux[plot_index].value,vmin=temp_min,vmax=temp_max)
-            ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=dss_levels,colors='white',alpha=0.9)
+            if contour_image_source == 'dss':
+                ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=clevels,colors='white',alpha=0.9)
+            elif contour_image_source == 'twomass':
+                ax.contour(twomass_image.data,transform=ax.get_transform(wcs_twomass),levels=clevels,colors='white',alpha=0.9)
             ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
 
             ax.set_xlim(-0.5,aper_width-0.5)  #This section is needed to fix the stupid plotting issue in Python 3.
