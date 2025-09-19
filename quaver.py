@@ -55,12 +55,12 @@ primary_correction_method = 3
 
 #Source of contours to aid with selection of aperture:
 
-contour_image_source = 'twomass'
-#contour_image_source = 'dss'
+#contour_image_source = 'twomass'
+contour_image_source = 'dss'
 
 
 #Size of the TPF postage stamp to download and use for extraction and detrending.
-tpf_width_height = 25
+tpf_width_height = 15
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -76,7 +76,7 @@ lowest_dss_contour = 0.4
 lowest_twomass_contour = 0.05
 
 #Acceptable threshold for systematics in additive components:
-sys_threshold = 0.2
+sys_threshold = 0.05
 
 #Maximum number of cadence-mask regions allowed:
 max_masked_regions = 5 #set maximum number of regions of the light curve that can be masked out.
@@ -237,7 +237,7 @@ except NameResolveError:
     print(source_coordinates)
     print("\n")
 
-
+'''
 if contour_image_source == 'dss':
     dss_image = SkyView.get_images(position=source_coordinates,survey='DSS',pixels=str(400))
 
@@ -249,20 +249,35 @@ if contour_image_source == 'dss':
     dss_head = dss_image[0][0].header
     dss_ra = dss_head['CRVAL1']
     dss_dec = dss_head['CRVAL2']
+'''
 
-elif contour_image_source == 'twomass':
+if contour_image_source == 'twomass':
     twomass_service = vo.dal.SIAService("https://irsa.ipac.caltech.edu/cgi-bin/2MASS/IM/nph-im_sia?type=at&ds=asky&")
     im_table = twomass_service.search(pos=source_coordinates, size=3.0*u.arcsec)
-    fname = download_file(im_table[0].getdataurl(), cache=True)
+    fname = download_file(im_table[6].getdataurl(), cache=True)
     image1 = pyfits.open(fname)
     wcs_twomass = WCS(image1[0].header)
-    num_arcsec = int(tpf_width_height*20)
+    num_arcsec = int(tpf_width_height*60)
     twomass_image = Cutout2D(image1[0].data, source_coordinates, (num_arcsec, num_arcsec), wcs=wcs_twomass)
     wcs_twomass = twomass_image.wcs
 
     cpixmin = np.nanmin(twomass_image.data)
     cpixmax = np.nanmax(twomass_image.data)
     cpixmean = np.nanmean(twomass_image.data)
+
+elif contour_image_source == 'dss':
+    dss_service = vo.dal.SIAService("http://archive.eso.org/bin/dss_sia/dss.sia?VERSION=1.0&")
+    im_table_dss = dss_service.search(pos=source_coordinates, size=10.0*u.arcmin)
+    fname = download_file(im_table_dss[4].getdataurl(), cache=True)
+    image1 = pyfits.open(fname)
+    wcs_dss2 = WCS(image1[0].header)
+    num_arcsec = int(tpf_width_height*60)
+    dss_image = Cutout2D(image1[0].data, source_coordinates, (num_arcsec, num_arcsec), wcs=wcs_dss2)
+    wcs_dss2 = dss_image.wcs
+
+    cpixmin = np.nanmin(dss_image.data)
+    cpixmax = np.nanmax(dss_image.data)
+    cpixmean = np.nanmean(dss_image.data)
 
 
 #Retrieve the available tesscut data for FFI-only targets.
@@ -425,7 +440,8 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
 
             ax.imshow(tpf.flux[plot_index].value,vmin=temp_min,vmax=temp_max)
             if contour_image_source == 'dss':
-                ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=clevels,colors='white',alpha=0.9)
+                #ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=clevels,colors='white',alpha=0.9)
+                ax.contour(dss_image.data,transform=ax.get_transform(wcs_dss2),levels=clevels,colors='white',alpha=0.9)
             elif contour_image_source == 'twomass':
                 ax.contour(twomass_image.data,transform=ax.get_transform(wcs_twomass),levels=clevels,colors='white',alpha=0.9)
             ax.scatter(aper_width/2.0,aper_width/2.0,marker='x',color='k',s=8)
