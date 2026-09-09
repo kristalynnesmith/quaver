@@ -51,7 +51,7 @@ from astropy.utils.data import download_file
 #  2 = simple hybrid reduction
 #  3 = full hybrid reduction
 
-primary_correction_method = 3
+primary_correction_method = 2
 
 #Source of contours to aid with selection of aperture:
 
@@ -60,7 +60,7 @@ contour_image_source = 'dss'
 
 
 #Size of the TPF postage stamp to download and use for extraction and detrending.
-tpf_width_height = 15
+tpf_width_height = 25
 
 #Number of PCA Components in the Hybrid method and simple PCA correction.
 additive_pca_num = 3
@@ -70,7 +70,7 @@ pca_only_num = 3
 #Lowest contour level for DSS images, if using, as fraction of peak brightness in contour image.
 #(For fields with bright stars, the default lowest level of 0.4 may be too high to see your faint source)
 #This number must be less than 0.65.
-lowest_dss_contour = 0.4
+lowest_dss_contour = 0.3
 
 #Lowest contour level for 2MASS images, if using, as a percentage of the mean background. Default is 5%.
 lowest_twomass_contour = 0.05
@@ -300,6 +300,7 @@ print('Cycle 4: Sectors 40-55')
 print('Cycle 5: Sectors 56-69')
 print('Cycle 6: Sectors 70-83')
 print('Cycle 7: Sectors 84-96')
+print('Cycle 8: Sectors 97-107')
 
 #Set cycle of interest, while making sure the chosen cycle corresponds to actual observed sectors:
 
@@ -309,8 +310,8 @@ while check_cycle == False:
 
     cycle = int(input('Enter Cycle: '))
 
-    first_sectors = [1,14,27,40,56,70,84]
-    last_sectors = [13,26,39,55,69,83,96]
+    first_sectors = [1,14,27,40,56,70,84,97]
+    last_sectors = [13,26,39,55,69,83,96,107]
 
     if cycle == 1:
         first_sector = first_sectors[0]
@@ -333,7 +334,9 @@ while check_cycle == False:
     elif cycle==7:
             first_sector = first_sectors[6]
             last_sector = last_sectors[6]
-
+    elif cycle==8:
+            first_sector = first_sectors[7]
+            last_sector = last_sectors[7]
     else:
         print('Invalid Cycle Number')
         sys.exit()
@@ -344,7 +347,8 @@ while check_cycle == False:
 
     for i in range(0,len(sector_data)):
 
-        sector_number = int(sector_data[i].mission[0][12:14])       #This will need to change, Y2K style, if TESS ever has more than 100 sectors.
+        sector_number = int(sector_data[i].mission[0][12:15])       #This will need to change, Y2K style, if TESS ever has more than 100 sectors.
+        print(sector_number)
         list_observed_sectors.append(sector_number)
 
         if sector_number >= first_sector and sector_number <= last_sector:
@@ -408,11 +412,6 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
             pixmax = np.max(tpf.flux[plot_index]).value
             pixmean = np.mean(tpf.flux[plot_index]).value
 
-            temp_min = float(pixmin)
-            # print(temp_min)
-            temp_max = float(1e-3*pixmax+pixmean)
-            #temp_max = pixmax
-            # print(temp_max)
 
             #Create a blank boolean array for the aperture, which will turn to TRUE when pixels are selected.
 
@@ -438,7 +437,7 @@ for i in range(0,len(list_sectordata_index_in_cycle)):
             # ax.imshow(tpf.flux[200],vmin=pixmin,vmax=1e-3*pixmax+pixmean)
             #clevels = [1.05*cpixmean,1.10*cpixmean,1.3*cpixmean,1.5*cpixmean]
 
-            ax.imshow(tpf.flux[plot_index].value,vmin=temp_min,vmax=temp_max)
+            ax.imshow(tpf.flux[plot_index].value,vmin=pixmin,vmax=pixmax)
             if contour_image_source == 'dss':
                 #ax.contour(dss_image[0][0].data,transform=ax.get_transform(wcs_dss),levels=clevels,colors='white',alpha=0.9)
                 ax.contour(dss_image.data,transform=ax.get_transform(wcs_dss2),levels=clevels,colors='white',alpha=0.9)
